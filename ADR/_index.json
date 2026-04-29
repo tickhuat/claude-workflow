@@ -47,5 +47,26 @@
     "status": "Accepted",
     "file": "0007-dev-rules-config-externalization.md",
     "summary": "新增 `lib/config.py`，載入 `.claude/dev-rules.config.yaml`（檔不存在則全用 default）。schema："
+  },
+  {
+    "id": "0008",
+    "title": "Rename project to claude-workflow + adopt MIT license",
+    "status": "Accepted",
+    "file": "0008-rename-claude-workflow-mit.md",
+    "summary": "- **Repo name + Python package name 改為 `claude-workflow`**：簡潔、無歧義、不綁特定品牌（不是 `claude-dev-rules` 因為那聽起來像 Anthropic 官方的東西）\n- **採用 MIT License**：最寬鬆的常用 OSS license；個人專案 + 偶爾分享情境下，最少摩擦"
+  },
+  {
+    "id": "0009",
+    "title": "GitHub template repo + init-fresh.sh as distribution mechanism",
+    "status": "Accepted",
+    "file": "0009-github-template-distribution.md",
+    "summary": "採用 **A：GitHub Template repo**，搭配 `scripts/init-fresh.sh` 給 fork 後想清掉 dogfood examples 的人用。"
+  },
+  {
+    "id": "0008",
+    "title": "dev-state.json schema_version field for forward-compat migration",
+    "status": "Accepted",
+    "file": "0010-state-schema-version.md",
+    "summary": "- 在 `INITIAL_STATE` 加 `\"schema_version\": 1`\n- `State.load()` 載入 legacy state（沒 `schema_version`）時，自動補 `schema_version: 1`，stderr 印一行 `[INFO by dev-rules] state schema_version added (was legacy v1)`，不擋\n- 未來 v2 schema 推出時：\n  - `State.load()` 偵測 `schema_version: 1` → 跑 `_migrate_v1_to_v2()` → 寫回 `schema_version: 2`\n  - migrator 函數放 `lib/state.py` 同檔\n  - 每個 v(N+1) migration 都需要新 ADR 紀錄"
   }
 ]
