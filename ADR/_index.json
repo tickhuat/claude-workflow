@@ -12,5 +12,40 @@
     "status": "Accepted",
     "file": "0002-pre-skill-manual-adrs-read-count.md",
     "summary": "Phase 2 採折衷：pre_skill 在阻擋訊息中提供 inline 一行指令讓 Claude 自己更新 `adrs_read_count`。Phase 4 之後才補 PostToolUse:Read 自動偵測。"
+  },
+  {
+    "id": "0003",
+    "title": "引入 PyYAML 為核心依賴，刪除自製 frontmatter parser",
+    "status": "Accepted",
+    "file": "0003-adopt-pyyaml-core-dep.md",
+    "summary": "把 `PyYAML>=6.0` 加進 `pyproject.toml` 的 `dependencies`，作為**唯一**外部依賴（其他繼續純 stdlib）。`lib/frontmatter.py` 整份刪除，改成 ~10 行 wrapper，內部以 `yaml.safe_load` 解析 fence 之間的內容；保留現有的 `parse(text) -> (frontmatter_dict, body_str)` 介面，呼叫端不必動。"
+  },
+  {
+    "id": "0004",
+    "title": "PostToolUse:Read hook 自動偵測 ADR 已讀",
+    "status": "Accepted",
+    "file": "0004-post-read-adr-tracking.md",
+    "summary": "新增 `PostToolUse:Read` hook（`.claude/scripts/post_read.py`）：偵測 `Read` 工具讀到 `ADR/*.md` 路徑時，把該 ADR slug 加入 `state.adrs_read: list[str]`（去重）。"
+  },
+  {
+    "id": "0005",
+    "title": "PostToolUse:Bash 對 git commit 做 ground-truth 驗證",
+    "status": "Accepted",
+    "file": "0005-post-bash-commit-groundtruth.md",
+    "summary": "新增 `PostToolUse:Bash` hook（`.claude/scripts/post_bash.py`）：偵測剛執行的 Bash 指令是 `git commit`（含 `--amend`）且 exit code 為 0，跑 `git log -1 --format=%B HEAD` 拿到**真正寫進 git 的 message**，再做 deviation note 檢查。違規時："
+  },
+  {
+    "id": "0006",
+    "title": "phase 驗證通過後自動推進 current_phase",
+    "status": "Accepted",
+    "file": "0006-auto-advance-phase.md",
+    "summary": "`post_skill.py` 偵測到 Agent 工具回 `VERIFY-PASS phase=N` 時，原本只推進到 `phase-N-verified`，現在再多做一步："
+  },
+  {
+    "id": "0007",
+    "title": "dev-rules 設定外移到 .claude/dev-rules.config.yaml",
+    "status": "Accepted",
+    "file": "0007-dev-rules-config-externalization.md",
+    "summary": "新增 `lib/config.py`，載入 `.claude/dev-rules.config.yaml`（檔不存在則全用 default）。schema："
   }
 ]
