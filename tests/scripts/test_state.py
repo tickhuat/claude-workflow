@@ -46,3 +46,30 @@ def test_corrupt_state_raises(tmp_project):
     state_path.write_text("not json")
     with pytest.raises(StateError):
         State.load()
+
+
+def test_initial_state_not_mutated_by_instance():
+    """Aliasing regression: mutating an instance must not poison INITIAL_STATE."""
+    s = State()
+    s.data["event_flags"]["debug_required"] = True
+    s.data["skills_invoked"].append("x")
+    assert INITIAL_STATE["event_flags"]["debug_required"] is False
+    assert INITIAL_STATE["skills_invoked"] == []
+
+
+def test_has_skill_reflects_record_skill(tmp_project):
+    s = State.load()
+    assert not s.has_skill("brainstorming")
+    s.record_skill("brainstorming")
+    assert s.has_skill("brainstorming")
+
+
+def test_load_forward_compat_partial_event_flags(tmp_project):
+    """Older state file with only one flag set — missing flags get filled from INITIAL_STATE."""
+    path = tmp_project / ".claude" / "dev-state.json"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps({"stage": "planning", "event_flags": {"debug_required": True}}))
+    s = State.load()
+    assert s.data["event_flags"]["debug_required"] is True
+    assert s.data["event_flags"]["parallel_required"] is False
+    assert s.data["event_flags"]["review_required"] is False

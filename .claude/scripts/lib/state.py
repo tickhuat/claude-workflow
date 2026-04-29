@@ -1,6 +1,7 @@
 """dev-state.json 狀態機讀寫。"""
 from __future__ import annotations
 
+import copy
 import json
 import os
 from dataclasses import dataclass, field
@@ -45,7 +46,7 @@ def state_path() -> Path:
 
 @dataclass
 class State:
-    data: dict[str, Any] = field(default_factory=lambda: dict(INITIAL_STATE))
+    data: dict[str, Any] = field(default_factory=lambda: copy.deepcopy(INITIAL_STATE))
 
     @classmethod
     def load(cls) -> "State":
@@ -57,7 +58,7 @@ class State:
         except json.JSONDecodeError as e:
             raise StateError(f"corrupt state at {p}: {e}") from e
         # 補齊新欄位（向前相容）
-        merged = dict(INITIAL_STATE)
+        merged = copy.deepcopy(INITIAL_STATE)
         merged.update(data)
         merged["event_flags"] = {**INITIAL_STATE["event_flags"], **(data.get("event_flags") or {})}
         return cls(data=merged)
