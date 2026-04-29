@@ -79,7 +79,7 @@ idle
   → exec-running           (executing-plans 或 subagent-driven-development 已呼叫)
   → phase-N-done           (該 phase 全部 target_files 已被 Edit 過)
   → phase-N-verified       (驗證 subagent 回傳 VERIFY-PASS phase=N)
-  ↻  下一 phase 重新進 exec-running
+  ↻  下一 phase 重新進 exec-running  [手動：需 Edit dev-state.json 設 stage=exec-running, current_phase=N+1]
   → all-phases-verified    (phases_verified 涵蓋 phases_total)
   → reviewed               (requesting-code-review 已呼叫)
   → done                   (finishing-a-development-branch 已呼叫)

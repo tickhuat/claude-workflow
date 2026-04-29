@@ -52,6 +52,12 @@ phases:
 
 **Tech Stack:** Python 3.10+ stdlib only（自寫簡化 frontmatter parser，避免 PyYAML 依賴）、pytest、Claude Code hooks API。
 
+> **Implementation notes (post-execution, 2026-04-29):** Three verbatim code blocks in this plan diverged from the final implementation during execution. The plan blocks are preserved as historical record; the differences are:
+>
+> 1. `_try_transition` in `post_skill.py` — The `can_transition()` gate was removed (Task 4.3 fix); `_SKILL_TO_STAGE` is now the sole authority. See commit `5ee98a5` context.
+> 2. `frontmatter.parse` — The old fast-path (`text.split(_FENCE + "\n", 2)`) was unified into a single `_split_with_eol` path (commit `94737d9`) for correctness with trailing-whitespace fences.
+> 3. `pre_edit` deviation_log — The plan's verbatim code appended on every visit; the fix adds `already_logged` dedup so the same file path isn't appended twice (commit `f1e678e`).
+
 ---
 
 ## File Structure（全 plan 涵蓋）
