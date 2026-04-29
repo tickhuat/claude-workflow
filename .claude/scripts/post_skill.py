@@ -16,7 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from lib.state import State, can_transition, next_stage_after_skill, project_root  # noqa: E402
+from lib.state import State, next_stage_after_skill, project_root  # noqa: E402
 from lib.frontmatter import parse, FrontmatterError  # noqa: E402
 
 
@@ -83,8 +83,8 @@ def _try_transition(state: State, skill: str) -> None:
     target = next_stage_after_skill(skill, state.data["stage"])
     if not target:
         return
-    if not can_transition(state.data["stage"], target):
-        return
+    # _SKILL_TO_STAGE is authoritative; no extra can_transition gate needed.
+    # (exec-prep is optional: executing-plans may jump plan-ready → exec-running)
     if target == "spec-ready":
         ok, spec = _check_spec()
         if not ok:
