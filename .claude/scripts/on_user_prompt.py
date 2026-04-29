@@ -11,19 +11,14 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.adr import index_path  # noqa: E402
+from lib.config import load_config  # noqa: E402
 from lib.state import State, StateError  # noqa: E402
 
 
-KEYWORDS = {
-    "debug_required": [r"\bbug\b", r"\berror\b", r"test fail", r"\bexception\b", r"\bcrash\b", r"traceback"],
-    "parallel_required": ["同時", "平行", "多個獨立", r"\bparallel\b"],
-    "review_required": [r"\breview\b", "PR comment", r"\bfeedback\b"],
-}
-
-
 def _detect_flags(prompt: str) -> dict[str, bool]:
+    keywords = load_config()["event_keywords"]
     out = {}
-    for flag, pats in KEYWORDS.items():
+    for flag, pats in keywords.items():
         if any(re.search(p, prompt, flags=re.IGNORECASE) for p in pats):
             out[flag] = True
     return out

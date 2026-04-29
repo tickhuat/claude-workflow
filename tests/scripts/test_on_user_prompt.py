@@ -72,3 +72,25 @@ def test_no_flag_when_no_keyword(tmp_project):
     if state_p.exists():
         state = json.loads(state_p.read_text())
         assert state["event_flags"]["debug_required"] is False
+
+
+def test_on_user_prompt_respects_custom_keywords(tmp_project):
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text(
+        "event_keywords:\n"
+        "  debug_required: ['故障', '掛了']\n"
+        "  parallel_required: []\n"
+        "  review_required: []\n"
+    )
+    r = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps({"prompt": "這個 endpoint 故障了"}),
+        capture_output=True, text=True,
+        cwd=tmp_project,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": "/usr/bin:/bin"},
+    )
+    assert r.returncode == 0
+    state_p = tmp_project / ".claude" / "dev-state.json"
+    if state_p.exists():
+        import json as _j
+        assert _j.loads(state_p.read_text())["event_flags"]["debug_required"] is True
