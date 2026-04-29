@@ -52,21 +52,58 @@
       "Bash(git clone *)",
       "Bash(git tag *)",
       "Bash(git config *)",
-      "Bash(gh *)"
+      "Bash(gh *)",
+      "Bash(python3 -m pytest)",
+      "Bash(python3 -m pip show pytest)",
+      "Bash(python3 -m pip install --user --dry-run pyyaml)",
+      "Bash(python3 -c \"import yaml; print\\('yaml', yaml.__version__\\)\")",
+      "Bash(python3 -m pytest tests/ -q)",
+      "Bash(python3 -m pytest tests/ -q --tb=no)",
+      "Bash(python3 -m pytest tests/scripts/test_frontmatter.py -v)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -m pytest tests/scripts/test_config.py -v)",
+      "Bash(python3 -m pytest tests/)",
+      "Bash(git -C /Users/leetickhuat/Workspace/everyday-agent status)",
+      "Bash(git -C /Users/leetickhuat/Workspace/everyday-agent add .claude/scripts/lib/config.py tests/scripts/test_config.py)",
+      "Bash(git -C /Users/leetickhuat/Workspace/everyday-agent commit -m ' *)",
+      "Bash(git -C /Users/leetickhuat/Workspace/everyday-agent show --stat HEAD)",
+      "Bash(python3 -m pytest tests/scripts/test_pre_edit.py -v)",
+      "Bash(python3 -m pytest tests/scripts/test_pre_edit.py::test_pre_edit_respects_custom_sensitive_globs -v)"
     ]
   },
   "hooks": {
     "UserPromptSubmit": [
-      { "command": "python3 .claude/scripts/on_user_prompt.py" }
+      {
+        "command": "python3 .claude/scripts/on_user_prompt.py"
+      }
     ],
     "PreToolUse": [
-      { "matcher": "Skill", "command": "python3 .claude/scripts/pre_skill.py" },
-      { "matcher": "Edit|Write|MultiEdit", "command": "python3 .claude/scripts/pre_edit.py" },
-      { "matcher": "Bash", "command": "python3 .claude/scripts/pre_bash.py" }
+      {
+        "matcher": "Skill",
+        "command": "python3 .claude/scripts/pre_skill.py"
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "command": "python3 .claude/scripts/pre_edit.py"
+      },
+      {
+        "matcher": "Bash",
+        "command": "python3 .claude/scripts/pre_bash.py"
+      }
     ],
     "PostToolUse": [
-      { "matcher": "Skill|Agent", "command": "python3 .claude/scripts/post_skill.py" },
-      { "matcher": "Edit|Write|MultiEdit", "command": "python3 .claude/scripts/post_edit.py" }
+      {
+        "matcher": "Skill|Agent",
+        "command": "python3 .claude/scripts/post_skill.py"
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "command": "python3 .claude/scripts/post_edit.py"
+      },
+      {
+        "matcher": "Read",
+        "command": "python3 .claude/scripts/post_read.py"
+      }
     ]
   }
 }
