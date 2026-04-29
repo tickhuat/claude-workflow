@@ -15,7 +15,7 @@ from lib.messages import format_block  # noqa: E402
 from lib.state import State, StateError  # noqa: E402
 
 
-_COMMIT_RE = re.compile(r"^\s*git\s+commit\b.*?-m\s+(['\"])(.+?)\1", re.DOTALL)
+_COMMIT_RE = re.compile(r"^\s*git\s+commit\b.*?-\w*m\s+(['\"])(.+?)\1", re.DOTALL)
 _PUSH_MAIN_RE = re.compile(r"^\s*git\s+push\b.*\b(main|master)\b")
 _MERGE_MAIN_RE = re.compile(r"^\s*git\s+merge\b.*\b(main|master)\b")
 

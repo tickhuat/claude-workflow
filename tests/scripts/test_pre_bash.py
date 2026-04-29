@@ -73,3 +73,12 @@ def test_non_git_passes(tmp_project):
     set_state(tmp_project, stage="idle")
     r = run_pre_bash("ls -la", tmp_project)
     assert r.returncode == 0
+
+
+def test_commit_dash_am_with_deviation_requires_note(tmp_project):
+    """Regression: git commit -am should also be checked, not just -m."""
+    set_state(tmp_project, stage="exec-running", current_phase=1,
+              deviation_log=[{"phase": 1, "file": "src/x.py"}])
+    r = run_pre_bash('git commit -am "feat: stuff"', tmp_project)
+    assert r.returncode == 2
+    assert "Deviation:" in r.stderr
