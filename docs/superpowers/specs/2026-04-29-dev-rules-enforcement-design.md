@@ -2,7 +2,8 @@
 title: Dev Rules Enforcement — Hook + State Machine 開發流程強制系統
 date: 2026-04-29
 status: Approved
-adrs: []   # bootstrap spec — ADR 系統尚未存在，待 plan 啟動後補 0001 Accept this design
+adrs:
+  - 0001-adopt-hook-state-machine-enforcement
 related_plans: []
 ---
 

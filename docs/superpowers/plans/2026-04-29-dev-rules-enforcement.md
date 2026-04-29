@@ -4,7 +4,8 @@ date: 2026-04-29
 status: Draft
 related_specs:
   - docs/superpowers/specs/2026-04-29-dev-rules-enforcement-design.md
-adrs: []
+adrs:
+  - 0001-adopt-hook-state-machine-enforcement
 phases:
   - id: 1
     name: 基礎框架 + ADR 系統
