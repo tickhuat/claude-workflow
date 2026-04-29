@@ -136,7 +136,7 @@ def test_pre_edit_blocks_skills_dir_until_writing_skills(tmp_project, set_stage)
 
 
 def test_pre_edit_blocks_when_debug_required(tmp_project, set_stage):
-    full = set_stage(stage="exec-running")
+    set_stage(stage="exec-running")
     # set_stage doesn't expose nested updates directly; reload and update
     sp = tmp_project / ".claude" / "dev-state.json"
     state = json.loads(sp.read_text())
@@ -161,3 +161,29 @@ def test_pre_edit_tdd_blocks_src_without_tests(tmp_project, set_stage):
     r = run_pre({"tool_name": "Write", "tool_input": {"file_path": str(src)}}, tmp_project)
     assert r.returncode == 2
     assert "test-driven-development" in r.stderr or "TDD" in r.stderr
+
+
+def test_pre_edit_passes_when_debug_required_skill_invoked(tmp_project, set_stage):
+    """event_flag.debug_required is True but systematic-debugging already invoked → pass."""
+    set_stage(stage="exec-running", skills_invoked=["systematic-debugging"])
+    sp = tmp_project / ".claude" / "dev-state.json"
+    state = json.loads(sp.read_text())
+    state["event_flags"]["debug_required"] = True
+    sp.write_text(json.dumps(state))
+    src = tmp_project / "src" / "a.py"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(src)}}, tmp_project)
+    # No event_flag block; falls to stage rules. exec-running with no plan → either deviation or pass through.
+    # We just need to verify event_flag block didn't fire (no "systematic-debugging" in stderr message).
+    assert "systematic-debugging" not in r.stderr or r.returncode == 0
+    # Stronger check: should NOT block from event_flag specifically
+    if r.returncode == 2:
+        assert "event flag" not in r.stderr
+
+
+def test_pre_edit_passes_skills_dir_when_writing_skills_invoked(tmp_project, set_stage):
+    """writing-skills already invoked + Edit on .claude/skills/** → passes via whitelist."""
+    set_stage(stage="exec-running", skills_invoked=["writing-skills"])
+    f = tmp_project / ".claude" / "skills" / "my-skill" / "SKILL.md"
+    r = run_pre({"tool_name": "Write", "tool_input": {"file_path": str(f)}}, tmp_project)
+    assert r.returncode == 0

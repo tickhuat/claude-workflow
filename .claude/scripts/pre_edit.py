@@ -219,8 +219,9 @@ def main() -> int:
             return 2
 
         # 5c. Soft warn (≤2 deviations)
-        s.data["deviation_log"].append({"phase": cur_phase, "file": rel})
-        s.save()
+        if rel not in unique_files:
+            s.data["deviation_log"].append({"phase": cur_phase, "file": rel})
+            s.save()
         print(
             f"[WARN by dev-rules] 小幅偏離 plan ({rel})，phase {cur_phase} 累計 {new_count}/2。"
             "建議 commit 加 'Deviation: <原因>'。",
