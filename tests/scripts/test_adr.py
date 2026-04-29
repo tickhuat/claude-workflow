@@ -64,3 +64,31 @@ def test_rebuild_index_invalid_adr_raises(tmp_project):
     (tmp_project / "ADR" / "0001-broken.md").write_text("no frontmatter here")
     with pytest.raises(ADRError):
         rebuild_index()
+
+
+def test_rebuild_index_no_decision_section(tmp_project):
+    """ADR with valid frontmatter but no '## Decision' section → empty summary."""
+    p = tmp_project / "ADR" / "0001-no-decision.md"
+    p.write_text(
+        "---\nid: 0001\ntitle: No Decision\nstatus: Accepted\n---\n\n"
+        "## Context\nctx\n\n## Consequences\nconseq\n"
+    )
+    rebuild_index()
+    idx = json.loads((tmp_project / "ADR" / "_index.json").read_text())
+    assert len(idx) == 1
+    assert idx[0]["id"] == "0001"
+    assert idx[0]["summary"] == ""
+
+
+def test_rebuild_index_decision_without_terminal_punctuation(tmp_project):
+    """Decision text with no period/句號/!? → whole paragraph returned as summary."""
+    p = tmp_project / "ADR" / "0001-no-period.md"
+    p.write_text(
+        "---\nid: 0001\ntitle: No Period\nstatus: Accepted\n---\n\n"
+        "## Decision\nTake the action without ending punctuation\n\n"
+        "## Consequences\nok\n"
+    )
+    rebuild_index()
+    idx = json.loads((tmp_project / "ADR" / "_index.json").read_text())
+    assert len(idx) == 1
+    assert idx[0]["summary"] == "Take the action without ending punctuation"
