@@ -8,6 +8,7 @@ __pycache__/
 # Claude project local state
 .claude/dev-state.json
 .claude/settings.local.json
+.claude/dev-rules.config.local.yaml
 .superpowers/
 
 # OS
