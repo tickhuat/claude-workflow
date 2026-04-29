@@ -26,6 +26,17 @@ def tmp_project(tmp_path, monkeypatch):
 import json as _json
 
 
+@pytest.fixture(autouse=True)
+def _reset_config_cache():
+    """Each test starts with a fresh config cache (avoids test-order coupling)."""
+    try:
+        from lib.config import _CACHE
+        _CACHE.clear()
+    except ImportError:
+        pass
+    yield
+
+
 @pytest.fixture
 def set_stage(tmp_project):
     """Helper to write specific dev-state.json with given stage and overrides."""
