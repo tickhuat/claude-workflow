@@ -19,20 +19,11 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
+from lib.config import load_config  # noqa: E402
 from lib.glob_match import matches_any  # noqa: E402
 from lib.messages import format_block  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
 
-
-GLOBAL_WHITELIST_GLOBS = [
-    "*.md", "*.css", "*.json", "*.toml",
-    "docs/**", ".claude/**", "tests/**", "ADR/**",
-    ".gitignore", "pyproject.toml",
-]
-
-SENSITIVE_GLOBS = [
-    "**/migrations/**", "**/schema*", "**/auth*", "**/*.config.*",
-]
 
 EVENT_FLAG_TO_SKILL = {
     "debug_required": "systematic-debugging",
@@ -114,6 +105,9 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+    cfg = load_config()
+    global_whitelist = cfg["global_whitelist"]
+    sensitive_globs = cfg["sensitive_globs"]
     stage = s.data["stage"]
 
     if is_bypassed():
@@ -148,7 +142,7 @@ def main() -> int:
         # (.claude/** is in whitelist so will pass)
 
     # 3. Global whitelist passes
-    if _matches_any(rel, GLOBAL_WHITELIST_GLOBS):
+    if _matches_any(rel, global_whitelist):
         return 0
 
     # 4. Stage gating (Phase 2 logic)
@@ -210,7 +204,7 @@ def main() -> int:
             return 0
 
         # 5b. sensitive types → block
-        if matches_any(rel, SENSITIVE_GLOBS):
+        if matches_any(rel, sensitive_globs):
             print(format_block(
                 problem=f"碰到敏感類型 ({rel})，需新 ADR 解釋。",
                 stage=stage,

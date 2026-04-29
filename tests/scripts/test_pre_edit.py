@@ -214,3 +214,17 @@ def test_pre_edit_persists_deviation_to_log(tmp_project, set_stage):
     extra3 = tmp_project / "src" / "extra3.py"
     r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(extra3)}}, tmp_project)
     assert r.returncode == 2
+
+
+def test_pre_edit_respects_custom_sensitive_globs(tmp_project, set_stage):
+    """Custom sensitive_globs from config should also block."""
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text("sensitive_globs:\n  - '**/payment*'\n")
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("---\nphases:\n  - id: 1\n    target_files:\n      - src/a.py\n---\nbody")
+    set_stage(stage="exec-running", current_plan="docs/superpowers/plans/p.md", current_phase=1)
+    payment = tmp_project / "src" / "payment_processor.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(payment)}}, tmp_project)
+    assert r.returncode == 2
+    assert "敏感" in r.stderr or "ADR" in r.stderr
