@@ -50,7 +50,11 @@ def _required_adrs(state: State) -> list[str]:
         idx = json.loads(ip.read_text())
     except json.JSONDecodeError:
         return []
-    return [e["file"].removesuffix(".md") for e in idx if isinstance(e, dict) and "file" in e]
+    return [
+        e["file"].removesuffix(".md")
+        for e in idx
+        if isinstance(e, dict) and "file" in e and e.get("status") == "Accepted"
+    ]
 
 
 def main() -> int:
