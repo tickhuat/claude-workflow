@@ -20,6 +20,12 @@ This repo enforces a structured development flow via Claude Code hooks. Spec: `d
 - Deviation 1-2 unique extra files: warn + commit message must contain `Deviation: <reason>`
 - Deviation ≥3: blocked until new ADR added
 
+**Multi-phase operation:**
+
+- After `Skill(executing-plans)` enters `exec-running`, set `current_phase` to the phase number you're working on. Edit `.claude/dev-state.json` and set `"current_phase": N`.
+- After `phase-N-verified`, to begin phase N+1: edit `.claude/dev-state.json` to set `"stage": "exec-running"` and `"current_phase": N+1`, then call `Skill(executing-plans)` again.
+- Multi-phase auto-transition is a known gap — see ADR backlog (Phase 5 follow-up).
+
 **Emergency:** `DEV_RULES_BYPASS=1` env var bypasses any hook block but logs to `.claude/bypass.log`.
 
 **Dev state:** `.claude/dev-state.json` (gitignored). Inspect: `cat .claude/dev-state.json | python3 -m json.tool`.
