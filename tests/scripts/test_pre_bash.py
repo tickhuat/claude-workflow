@@ -96,3 +96,21 @@ def test_commit_keyword_from_config(tmp_project):
     # New keyword 'BREAK:' should pass
     r = run_pre_bash('git commit -m "feat: stuff. BREAK: x"', tmp_project)
     assert r.returncode == 0
+
+
+def test_push_blocked_when_last_commit_violation_set(tmp_project):
+    """If state.last_commit_violation exists, push to any branch is blocked."""
+    set_state(
+        tmp_project, stage="exec-running",
+        last_commit_violation={"phase": 1, "message_excerpt": "fix: typo", "ts": "2026-04-29T..."},
+    )
+    r = run_pre_bash("git push origin feature/x", tmp_project)
+    assert r.returncode == 2
+    assert "amend" in r.stderr.lower()
+
+
+def test_push_passes_when_violation_cleared(tmp_project):
+    """If last_commit_violation is None (cleared by amend), push passes."""
+    set_state(tmp_project, stage="done", last_commit_violation=None)
+    r = run_pre_bash("git push origin main", tmp_project)
+    assert r.returncode == 0

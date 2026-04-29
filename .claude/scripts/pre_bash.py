@@ -48,6 +48,22 @@ def main() -> int:
         log_bypass(hook="pre_bash", tool="Bash", tool_input={"command": cmd}, stage=s.data["stage"])
         return 0
 
+    # 0. last_commit_violation 擋所有 git push / git merge
+    if (s.data.get("last_commit_violation") is not None
+            and ("git push" in cmd or "git merge" in cmd)):
+        v = s.data["last_commit_violation"]
+        keyword = load_config()["commit_deviation_keyword"]
+        print(format_block(
+            problem=f"上一個 commit 含 plan 外檔案但 message 缺 '{keyword}' 註記。",
+            stage=s.data["stage"],
+            phase=v.get("phase"),
+            actions=[
+                f"git commit --amend -m \"...原訊息 + '{keyword} <原因>'...\"",
+                "amend 完後重試 push/merge。",
+            ],
+        ), file=sys.stderr)
+        return 2
+
     # 1. git commit deviation note check
     m_commit = _COMMIT_RE.search(cmd)
     if m_commit:
