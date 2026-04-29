@@ -1,14 +1,18 @@
 ---
 id: 0002
 title: pre_skill 強讀 ADR 採手動 adrs_read_count（暫行）
-status: Accepted
+status: Superseded
 date: 2026-04-29
 related_specs:
   - docs/superpowers/specs/2026-04-29-dev-rules-enforcement-design.md
 related_plans:
   - docs/superpowers/plans/2026-04-29-dev-rules-enforcement.md
 supersedes: null
+superseded_by: 0004-post-read-adr-tracking
 ---
+
+> **Superseded by [ADR 0004](0004-post-read-adr-tracking.md)** —
+> Phase 4 已落地 PostToolUse:Read 自動偵測，本 ADR 的折衷方案不再需要。
 
 ## Context
 

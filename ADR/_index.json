@@ -9,7 +9,7 @@
   {
     "id": "0002",
     "title": "pre_skill 強讀 ADR 採手動 adrs_read_count（暫行）",
-    "status": "Accepted",
+    "status": "Superseded",
     "file": "0002-pre-skill-manual-adrs-read-count.md",
     "summary": "Phase 2 採折衷：pre_skill 在阻擋訊息中提供 inline 一行指令讓 Claude 自己更新 `adrs_read_count`。Phase 4 之後才補 PostToolUse:Read 自動偵測。"
   },
