@@ -1,5 +1,7 @@
 # claude-workflow
 
+[![tests](https://github.com/<user>/claude-workflow/actions/workflows/test.yml/badge.svg)](https://github.com/<user>/claude-workflow/actions/workflows/test.yml)
+
 A hook + state-machine system that enforces a structured dev workflow on Claude Code: spec → plan → execute → verify → review → done. Stop relying on Claude's self-discipline; let the harness block deviations.
 
 ## What is this?
