@@ -165,3 +165,50 @@ def test_systematic_debugging_clears_flag(tmp_project):
     run(POST, {"tool_name": "Skill", "tool_input": {"skill": "systematic-debugging"}}, tmp_project)
     state = json.loads(sp.read_text())
     assert state["event_flags"]["debug_required"] is False
+
+
+def test_post_skill_auto_advances_to_next_phase(tmp_project, set_stage):
+    """VERIFY-PASS phase=1 with phases_total=3 should advance to current_phase=2, exec-running."""
+    set_stage(stage="phase-1-done", current_phase=1, phases_total=3)
+    event = {
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general-purpose", "prompt": "..."},
+        "tool_response": {"content": [{"type": "text", "text": "VERIFY-PASS phase=1"}]},
+    }
+    r = run(POST, event, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert 1 in state["phases_verified"]
+    assert state["stage"] == "exec-running"
+    assert state["current_phase"] == 2
+
+
+def test_post_skill_auto_advance_last_phase_goes_to_all_verified(tmp_project, set_stage):
+    """VERIFY-PASS for the last phase should go to all-phases-verified, not next phase."""
+    set_stage(stage="phase-2-done", current_phase=2, phases_total=2, phases_verified=[1])
+    event = {
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general-purpose", "prompt": "..."},
+        "tool_response": {"content": [{"type": "text", "text": "VERIFY-PASS phase=2"}]},
+    }
+    r = run(POST, event, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["stage"] == "all-phases-verified"
+
+
+def test_post_skill_auto_advance_disabled_by_config(tmp_project, set_stage):
+    """auto_advance_phase: false → stays at phase-N-verified."""
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text("auto_advance_phase: false\n")
+    set_stage(stage="phase-1-done", current_phase=1, phases_total=3)
+    event = {
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general-purpose", "prompt": "..."},
+        "tool_response": {"content": [{"type": "text", "text": "VERIFY-PASS phase=1"}]},
+    }
+    r = run(POST, event, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["stage"] == "phase-1-verified"
+    assert state["current_phase"] == 1

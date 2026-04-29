@@ -156,8 +156,16 @@ def main() -> int:
                 s.data["phases_verified"].append(n)
             if s.data["stage"] == f"phase-{n}-done":
                 s.set_stage(f"phase-{n}-verified")
-                if s.data["phases_total"] and len(s.data["phases_verified"]) >= s.data["phases_total"]:
+                # Auto-advance: if all phases done → all-phases-verified;
+                # else (config permitting) advance to next phase's exec-running
+                all_done = s.data["phases_total"] and len(s.data["phases_verified"]) >= s.data["phases_total"]
+                if all_done:
                     s.set_stage("all-phases-verified")
+                else:
+                    from lib.config import load_config
+                    if load_config().get("auto_advance_phase", True):
+                        s.set_stage("exec-running")
+                        s.data["current_phase"] = n + 1
             s.save()
         elif m_fail:
             n, reason = m_fail.group(1), m_fail.group(2).strip()
