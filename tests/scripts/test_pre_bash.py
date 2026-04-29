@@ -109,6 +109,26 @@ def test_push_blocked_when_last_commit_violation_set(tmp_project):
     assert "amend" in r.stderr.lower()
 
 
+def test_echo_containing_git_push_does_not_trigger_violation_guard(tmp_project):
+    """Layer-0 last_commit_violation guard should match real git push, not arbitrary text containing it."""
+    set_state(
+        tmp_project, stage="exec-running",
+        last_commit_violation={"phase": 1, "message_excerpt": "x", "ts": "2026-04-29T..."},
+    )
+    r = run_pre_bash('echo "git push origin main"', tmp_project)
+    assert r.returncode == 0  # echo is fine, not a real git command
+
+
+def test_real_git_push_still_blocked_by_violation_guard(tmp_project):
+    """Sanity: real git push is still blocked when violation is set."""
+    set_state(
+        tmp_project, stage="exec-running",
+        last_commit_violation={"phase": 1, "message_excerpt": "x", "ts": "2026-04-29T..."},
+    )
+    r = run_pre_bash("git push origin feature/x", tmp_project)
+    assert r.returncode == 2
+
+
 def test_push_passes_when_violation_cleared(tmp_project):
     """If last_commit_violation is None (cleared by amend), push passes."""
     set_state(tmp_project, stage="done", last_commit_violation=None)

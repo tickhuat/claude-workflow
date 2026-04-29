@@ -19,6 +19,7 @@ from lib.state import State, StateError  # noqa: E402
 _COMMIT_RE = re.compile(r"^\s*git\s+commit\b.*?-\w*m\s+(['\"])(.+?)\1", re.DOTALL)
 _PUSH_MAIN_RE = re.compile(r"^\s*git\s+push\b.*\b(main|master)\b")
 _MERGE_MAIN_RE = re.compile(r"^\s*git\s+merge\b.*\b(main|master)\b")
+_PUSH_OR_MERGE_RE = re.compile(r"^\s*git\s+(push|merge)\b")
 
 
 def main() -> int:
@@ -49,8 +50,7 @@ def main() -> int:
         return 0
 
     # 0. last_commit_violation 擋所有 git push / git merge
-    if (s.data.get("last_commit_violation") is not None
-            and ("git push" in cmd or "git merge" in cmd)):
+    if s.data.get("last_commit_violation") is not None and _PUSH_OR_MERGE_RE.match(cmd):
         v = s.data["last_commit_violation"]
         keyword = load_config()["commit_deviation_keyword"]
         print(format_block(
