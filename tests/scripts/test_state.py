@@ -107,3 +107,21 @@ def test_next_stage_after_skill_writing_plans():
 def test_next_stage_after_skill_executing_plans():
     assert next_stage_after_skill("executing-plans", "plan-ready") == "exec-running"
     assert next_stage_after_skill("subagent-driven-development", "plan-ready") == "exec-running"
+
+
+def test_initial_state_has_adrs_read_list(tmp_project):
+    s = State.load()
+    assert s.data["adrs_read"] == []
+
+
+def test_state_load_drops_legacy_adrs_read_count(tmp_project):
+    """If old state has adrs_read_count, load should not crash; new field defaults []."""
+    path = tmp_project / ".claude" / "dev-state.json"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps({
+        "stage": "session-started",
+        "adrs_read_count": 5,  # legacy field
+    }))
+    s = State.load()
+    assert s.data["adrs_read"] == []  # new field default present
+    # legacy key may still be in s.data but shouldn't crash anything

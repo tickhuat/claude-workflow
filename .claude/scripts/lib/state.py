@@ -22,6 +22,7 @@ INITIAL_STATE: dict[str, Any] = {
     "phases_total": 0,
     "phases_verified": [],
     "skills_invoked": [],
+    "adrs_read": [],
     "deviation_log": [],
     "event_flags": {
         "debug_required": False,
