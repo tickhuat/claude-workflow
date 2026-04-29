@@ -73,3 +73,37 @@ def test_load_forward_compat_partial_event_flags(tmp_project):
     assert s.data["event_flags"]["debug_required"] is True
     assert s.data["event_flags"]["parallel_required"] is False
     assert s.data["event_flags"]["review_required"] is False
+
+
+from lib.state import VALID_STAGES, can_transition, next_stage_after_skill
+
+
+def test_valid_stages_includes_full_lifecycle():
+    for s in [
+        "idle", "session-started", "spec-ready", "plan-ready",
+        "exec-prep", "exec-running", "phase-1-done", "phase-1-verified",
+        "all-phases-verified", "reviewed", "done",
+    ]:
+        assert s in VALID_STAGES
+
+
+def test_can_transition_forward_only():
+    assert can_transition("idle", "session-started") is True
+    assert can_transition("spec-ready", "plan-ready") is True
+    assert can_transition("plan-ready", "spec-ready") is False
+    assert can_transition("idle", "plan-ready") is False  # 不能跳關
+
+
+def test_next_stage_after_skill_brainstorming():
+    assert next_stage_after_skill("brainstorming", "session-started") == "spec-ready"
+    # 若不在前置 stage，不轉
+    assert next_stage_after_skill("brainstorming", "idle") is None
+
+
+def test_next_stage_after_skill_writing_plans():
+    assert next_stage_after_skill("writing-plans", "spec-ready") == "plan-ready"
+
+
+def test_next_stage_after_skill_executing_plans():
+    assert next_stage_after_skill("executing-plans", "plan-ready") == "exec-running"
+    assert next_stage_after_skill("subagent-driven-development", "plan-ready") == "exec-running"
