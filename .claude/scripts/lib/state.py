@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,7 @@ class StateError(RuntimeError):
 
 
 INITIAL_STATE: dict[str, Any] = {
+    "schema_version": 1,
     "stage": "idle",
     "current_spec": None,
     "current_plan": None,
@@ -58,6 +60,13 @@ class State:
             data = json.loads(p.read_text())
         except json.JSONDecodeError as e:
             raise StateError(f"corrupt state at {p}: {e}") from e
+        # Legacy detection: state files predating schema_version (introduced in spec-2)
+        if "schema_version" not in data:
+            print(
+                "[INFO by dev-rules] state schema_version added (was legacy v1)",
+                file=sys.stderr,
+            )
+            data["schema_version"] = 1
         # 補齊新欄位（向前相容）
         merged = copy.deepcopy(INITIAL_STATE)
         merged.update(data)

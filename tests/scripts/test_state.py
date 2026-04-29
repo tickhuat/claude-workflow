@@ -125,3 +125,37 @@ def test_state_load_drops_legacy_adrs_read_count(tmp_project):
     s = State.load()
     assert s.data["adrs_read"] == []  # new field default present
     # legacy key may still be in s.data but shouldn't crash anything
+
+
+def test_initial_state_has_schema_version(tmp_project):
+    s = State.load()
+    assert s.data["schema_version"] == 1
+
+
+def test_legacy_state_without_schema_version_is_auto_filled(tmp_project, capsys):
+    """Legacy state files (no schema_version key) should load OK and gain version 1."""
+    path = tmp_project / ".claude" / "dev-state.json"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps({
+        "stage": "session-started",
+        "skills_invoked": ["using-superpowers"],
+        # NOTE: no schema_version
+    }))
+    s = State.load()
+    assert s.data["schema_version"] == 1
+    err = capsys.readouterr().err
+    assert "schema_version" in err and "legacy" in err.lower()
+
+
+def test_state_with_existing_schema_version_does_not_warn(tmp_project, capsys):
+    """If schema_version is already present, no INFO message."""
+    path = tmp_project / ".claude" / "dev-state.json"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps({
+        "stage": "idle",
+        "schema_version": 1,
+    }))
+    s = State.load()
+    assert s.data["schema_version"] == 1
+    err = capsys.readouterr().err
+    assert "legacy" not in err.lower()
