@@ -21,7 +21,7 @@ sys.path.insert(0, str(HERE))
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.glob_match import matches_any  # noqa: E402
 from lib.messages import format_block  # noqa: E402
-from lib.state import State, project_root  # noqa: E402
+from lib.state import State, StateError, project_root  # noqa: E402
 
 
 GLOBAL_WHITELIST_GLOBS = [
@@ -105,7 +105,15 @@ def main() -> int:
     except ValueError:
         return 0
 
-    s = State.load()
+    try:
+        s = State.load()
+    except StateError as e:
+        print(
+            f"[BLOCKED by dev-rules] dev-state.json 損壞：{e}\n"
+            "修復或刪除 .claude/dev-state.json 重置（會丟失目前狀態）。",
+            file=sys.stderr,
+        )
+        return 2
     stage = s.data["stage"]
 
     if is_bypassed():

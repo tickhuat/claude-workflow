@@ -12,7 +12,7 @@ sys.path.insert(0, str(HERE))
 
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.messages import format_block  # noqa: E402
-from lib.state import State  # noqa: E402
+from lib.state import State, StateError  # noqa: E402
 
 
 _COMMIT_RE = re.compile(r"^\s*git\s+commit\b.*?-m\s+(['\"])(.+?)\1", re.DOTALL)
@@ -34,7 +34,15 @@ def main() -> int:
     if not cmd:
         return 0
 
-    s = State.load()
+    try:
+        s = State.load()
+    except StateError as e:
+        print(
+            f"[BLOCKED by dev-rules] dev-state.json 損壞：{e}\n"
+            "修復或刪除 .claude/dev-state.json 重置（會丟失目前狀態）。",
+            file=sys.stderr,
+        )
+        return 2
     if is_bypassed():
         log_bypass(hook="pre_bash", tool="Bash", tool_input={"command": cmd}, stage=s.data["stage"])
         return 0

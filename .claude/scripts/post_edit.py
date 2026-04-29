@@ -16,7 +16,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.adr import rebuild_index, ADRError  # noqa: E402
-from lib.state import project_root  # noqa: E402
+from lib.state import project_root, StateError  # noqa: E402
 
 
 def main() -> int:
@@ -45,7 +45,11 @@ def main() -> int:
 
     # Phase target_files progress tracking
     from lib.state import State
-    s = State.load()
+    try:
+        s = State.load()
+    except StateError as e:
+        print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
+        return 0
     if s.data["stage"] in ("exec-prep", "exec-running") and s.data.get("current_phase"):
         from lib.frontmatter import parse, FrontmatterError
         from lib.glob_match import matches_any

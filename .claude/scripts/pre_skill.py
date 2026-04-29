@@ -16,7 +16,7 @@ sys.path.insert(0, str(HERE))
 from lib.adr import index_path  # noqa: E402
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.messages import format_block  # noqa: E402
-from lib.state import State  # noqa: E402
+from lib.state import State, StateError  # noqa: E402
 
 
 _GATED_SKILLS = {"brainstorming", "writing-plans"}
@@ -37,7 +37,15 @@ def main() -> int:
         return 0
 
     if is_bypassed():
-        s = State.load()
+        try:
+            s = State.load()
+        except StateError as e:
+            print(
+                f"[BLOCKED by dev-rules] dev-state.json 損壞：{e}\n"
+                "修復或刪除 .claude/dev-state.json 重置（會丟失目前狀態）。",
+                file=sys.stderr,
+            )
+            return 2
         log_bypass(
             hook="pre_skill",
             tool="Skill",
@@ -56,7 +64,15 @@ def main() -> int:
     if not idx:
         return 0
 
-    s = State.load()
+    try:
+        s = State.load()
+    except StateError as e:
+        print(
+            f"[BLOCKED by dev-rules] dev-state.json 損壞：{e}\n"
+            "修復或刪除 .claude/dev-state.json 重置（會丟失目前狀態）。",
+            file=sys.stderr,
+        )
+        return 2
     last_index_size = s.data.get("adrs_read_count", 0)
     if last_index_size >= len(idx):
         return 0

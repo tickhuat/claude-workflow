@@ -16,7 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from lib.state import State, next_stage_after_skill, project_root  # noqa: E402
+from lib.state import State, StateError, next_stage_after_skill, project_root  # noqa: E402
 from lib.frontmatter import parse, FrontmatterError  # noqa: E402
 
 
@@ -129,7 +129,11 @@ def main() -> int:
         skill = (event.get("tool_input") or {}).get("skill", "")
         if not skill:
             return 0
-        s = State.load()
+        try:
+            s = State.load()
+        except StateError as e:
+            print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
+            return 0
         s.record_skill(skill)
         # Clear event_flag if this skill resolves it
         flag = SKILL_CLEARS_FLAG.get(skill)
@@ -143,7 +147,11 @@ def main() -> int:
         m_fail = re.search(r"VERIFY-FAIL\s+phase=(\d+)\s+reason=([^\n]+)", text)
         if m_pass:
             n = int(m_pass.group(1))
-            s = State.load()
+            try:
+                s = State.load()
+            except StateError as e:
+                print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
+                return 0
             if n not in s.data["phases_verified"]:
                 s.data["phases_verified"].append(n)
             if s.data["stage"] == f"phase-{n}-done":
@@ -153,7 +161,11 @@ def main() -> int:
             s.save()
         elif m_fail:
             n, reason = m_fail.group(1), m_fail.group(2).strip()
-            s = State.load()
+            try:
+                s = State.load()
+            except StateError as e:
+                print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
+                return 0
             s.data["last_verify_fail"] = f"phase={n}: {reason}"
             s.save()
     return 0

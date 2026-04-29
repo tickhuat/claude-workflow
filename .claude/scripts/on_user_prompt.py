@@ -11,7 +11,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.adr import index_path  # noqa: E402
-from lib.state import State  # noqa: E402
+from lib.state import State, StateError  # noqa: E402
 
 
 KEYWORDS = {
@@ -63,7 +63,12 @@ def main() -> int:
     # Set event_flags from keywords
     flags = _detect_flags(prompt)
     if flags:
-        s = State.load()
+        try:
+            s = State.load()
+        except StateError as e:
+            print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
+            _print_adr_index()
+            return 0
         for k, v in flags.items():
             s.data["event_flags"][k] = v
         s.save()
