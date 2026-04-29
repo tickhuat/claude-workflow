@@ -152,3 +152,16 @@ def test_post_skill_records_verify_fail(tmp_project, set_stage):
     assert 1 not in state["phases_verified"]
     assert state["stage"] == "phase-1-done"
     assert "test_x" in state.get("last_verify_fail", "")
+
+
+def test_systematic_debugging_clears_flag(tmp_project):
+    sp = tmp_project / ".claude" / "dev-state.json"
+    sp.parent.mkdir(exist_ok=True)
+    from lib.state import INITIAL_STATE
+    import copy as _copy
+    full = _copy.deepcopy(INITIAL_STATE)
+    full["event_flags"]["debug_required"] = True
+    sp.write_text(json.dumps(full))
+    run(POST, {"tool_name": "Skill", "tool_input": {"skill": "systematic-debugging"}}, tmp_project)
+    state = json.loads(sp.read_text())
+    assert state["event_flags"]["debug_required"] is False

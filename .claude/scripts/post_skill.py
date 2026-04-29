@@ -20,6 +20,13 @@ from lib.state import State, can_transition, next_stage_after_skill, project_roo
 from lib.frontmatter import parse, FrontmatterError  # noqa: E402
 
 
+SKILL_CLEARS_FLAG = {
+    "systematic-debugging": "debug_required",
+    "dispatching-parallel-agents": "parallel_required",
+    "receiving-code-review": "review_required",
+}
+
+
 def _newest(globs: list[str]) -> Path | None:
     candidates: list[Path] = []
     for g in globs:
@@ -124,6 +131,10 @@ def main() -> int:
             return 0
         s = State.load()
         s.record_skill(skill)
+        # Clear event_flag if this skill resolves it
+        flag = SKILL_CLEARS_FLAG.get(skill)
+        if flag:
+            s.data["event_flags"][flag] = False
         _try_transition(s, skill)
         s.save()
     if tool_name == "Agent":
