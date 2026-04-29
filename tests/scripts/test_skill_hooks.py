@@ -122,3 +122,33 @@ def test_pre_skill_passes_other_skills(tmp_project):
     ]))
     r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "systematic-debugging"}}, tmp_project)
     assert r.returncode == 0
+
+
+def test_post_skill_verifies_phase(tmp_project, set_stage):
+    set_stage(stage="phase-1-done", current_phase=1, phases_total=1)
+    event = {
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general-purpose", "prompt": "..."},
+        "tool_response": {"content": [{"type": "text", "text": "All good. VERIFY-PASS phase=1"}]},
+    }
+    r = run(POST, event, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert 1 in state["phases_verified"]
+    # Since phases_total=1 and phases_verified=[1], stage should advance to all-phases-verified
+    assert state["stage"] == "all-phases-verified"
+
+
+def test_post_skill_records_verify_fail(tmp_project, set_stage):
+    set_stage(stage="phase-1-done", current_phase=1)
+    event = {
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general-purpose", "prompt": "..."},
+        "tool_response": {"content": [{"type": "text", "text": "Two tests failed. VERIFY-FAIL phase=1 reason=test_x failed"}]},
+    }
+    r = run(POST, event, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert 1 not in state["phases_verified"]
+    assert state["stage"] == "phase-1-done"
+    assert "test_x" in state.get("last_verify_fail", "")

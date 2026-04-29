@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -99,6 +100,15 @@ def _try_transition(state: State, skill: str) -> None:
     state.set_stage(target)
 
 
+def _extract_agent_text(resp: dict) -> str:
+    content = resp.get("content") or []
+    out = []
+    for c in content:
+        if isinstance(c, dict) and c.get("type") == "text":
+            out.append(c.get("text", ""))
+    return "\n".join(out)
+
+
 def main() -> int:
     raw = sys.stdin.read()
     if not raw.strip():
@@ -116,7 +126,25 @@ def main() -> int:
         s.record_skill(skill)
         _try_transition(s, skill)
         s.save()
-    # Agent VERIFY-PASS detection added in Phase 3 task 3.2
+    if tool_name == "Agent":
+        text = _extract_agent_text(event.get("tool_response") or {})
+        m_pass = re.search(r"VERIFY-PASS\s+phase=(\d+)", text)
+        m_fail = re.search(r"VERIFY-FAIL\s+phase=(\d+)\s+reason=([^\n]+)", text)
+        if m_pass:
+            n = int(m_pass.group(1))
+            s = State.load()
+            if n not in s.data["phases_verified"]:
+                s.data["phases_verified"].append(n)
+            if s.data["stage"] == f"phase-{n}-done":
+                s.set_stage(f"phase-{n}-verified")
+                if s.data["phases_total"] and len(s.data["phases_verified"]) >= s.data["phases_total"]:
+                    s.set_stage("all-phases-verified")
+            s.save()
+        elif m_fail:
+            n, reason = m_fail.group(1), m_fail.group(2).strip()
+            s = State.load()
+            s.data["last_verify_fail"] = f"phase={n}: {reason}"
+            s.save()
     return 0
 
 
