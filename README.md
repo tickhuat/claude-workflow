@@ -1,6 +1,6 @@
 # claude-workflow
 
-[![tests](https://github.com/<user>/claude-workflow/actions/workflows/test.yml/badge.svg)](https://github.com/<user>/claude-workflow/actions/workflows/test.yml)
+[![tests](https://github.com/tickhuat/claude-workflow/actions/workflows/test.yml/badge.svg)](https://github.com/tickhuat/claude-workflow/actions/workflows/test.yml)
 
 A hook + state-machine system that enforces a structured dev workflow on Claude Code: spec → plan → execute → verify → review → done. Stop relying on Claude's self-discipline; let the harness block deviations.
 
@@ -19,7 +19,7 @@ When Claude Code edits your codebase, this system blocks edits that skip the str
 ### Use as template (recommended)
 
 ```bash
-gh repo create my-project --template <user>/claude-workflow
+gh repo create my-project --template tickhuat/claude-workflow
 cd my-project
 bash scripts/init-fresh.sh   # cleans dogfood examples
 ```
@@ -29,7 +29,7 @@ Or via GitHub UI: click "Use this template" on the repo page.
 ### Fork and customize
 
 ```bash
-git clone <user>/claude-workflow my-project
+git clone tickhuat/claude-workflow my-project
 cd my-project
 bash scripts/init-fresh.sh
 ```
