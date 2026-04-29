@@ -1,4 +1,4 @@
-# PJM Agent
+# claude-workflow
 
 ## Dev Rules Enforcement
 
