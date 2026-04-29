@@ -247,6 +247,41 @@ def test_post_skill_auto_advance_last_phase_goes_to_all_verified(tmp_project, se
     assert state["stage"] == "all-phases-verified"
 
 
+def test_post_skill_auto_advance_skips_when_n_mismatches_current_phase(tmp_project, set_stage):
+    """If VERIFY-PASS phase=N but state.current_phase != N, do NOT auto-advance."""
+    set_stage(stage="exec-running", current_phase=2, phases_total=5)
+    event = {
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general-purpose", "prompt": "..."},
+        "tool_response": {"content": [{"type": "text", "text": "VERIFY-PASS phase=4"}]},
+    }
+    r = run(POST, event, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    # phase 4 is recorded as verified (idempotent), but current_phase doesn't move
+    assert 4 in state["phases_verified"]
+    assert state["current_phase"] == 2
+    assert state["stage"] == "exec-running"  # unchanged
+
+
+def test_post_skill_auto_advance_warns_on_n_mismatch_within_phase_done(tmp_project, set_stage):
+    """If stage=phase-N-done but current_phase mismatches N, warn and don't advance."""
+    set_stage(stage="phase-3-done", current_phase=99, phases_total=5)  # corrupt state
+    event = {
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general-purpose", "prompt": "..."},
+        "tool_response": {"content": [{"type": "text", "text": "VERIFY-PASS phase=3"}]},
+    }
+    r = run(POST, event, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    # phase 3 verified, stage moves to phase-3-verified (not advanced further)
+    assert 3 in state["phases_verified"]
+    assert state["stage"] == "phase-3-verified"
+    assert state["current_phase"] == 99  # unchanged due to guard
+    assert "not auto-advancing" in r.stderr
+
+
 def test_post_skill_auto_advance_disabled_by_config(tmp_project, set_stage):
     """auto_advance_phase: false → stays at phase-N-verified."""
     cfg = tmp_project / ".claude" / "dev-rules.config.yaml"

@@ -164,8 +164,16 @@ def main() -> int:
                 else:
                     from lib.config import load_config
                     if load_config().get("auto_advance_phase", True):
-                        s.set_stage("exec-running")
-                        s.data["current_phase"] = n + 1
+                        # Defensive: only advance if n matches current_phase (avoid stale-state jumps)
+                        if n != s.data.get("current_phase"):
+                            print(
+                                f"[WARN by dev-rules] VERIFY-PASS phase={n} but current_phase="
+                                f"{s.data.get('current_phase')}; not auto-advancing.",
+                                file=sys.stderr,
+                            )
+                        else:
+                            s.set_stage("exec-running")
+                            s.data["current_phase"] = n + 1
             s.save()
         elif m_fail:
             n, reason = m_fail.group(1), m_fail.group(2).strip()
