@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""PreToolUse: Edit/Write/MultiEdit hook (Phase 2 minimal).
+"""PreToolUse: Edit/Write/MultiEdit hook (Phase 3 full).
 
-Phase 2 範圍：擋階段不對的 Edit。
-Phase 3 擴充：偏離偵測、TDD、敏感類型、event_flags 觸發 skills。
+Rules in evaluation order:
+1. event_flags triggers (debug/parallel/review required → require corresponding skill)
+2. .claude/skills/** path → require writing-skills skill
+3. Global whitelist (*.md, docs/**, tests/**, .claude/**, ADR/**, etc.) → pass
+4. Stage gating (idle/session-started/spec-ready/plan-ready → block src edits)
+5. Exec-stage: target_files match, sensitive types, TDD, deviation counting
 """
 from __future__ import annotations
 
@@ -14,16 +18,26 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+from lib.glob_match import matches_any  # noqa: E402
 from lib.messages import format_block  # noqa: E402
 from lib.state import State, project_root  # noqa: E402
 
 
-# Global whitelist: any stage allows these
 GLOBAL_WHITELIST_GLOBS = [
     "*.md", "*.css", "*.json", "*.toml",
     "docs/**", ".claude/**", "tests/**", "ADR/**",
     ".gitignore", "pyproject.toml",
 ]
+
+SENSITIVE_GLOBS = [
+    "**/migrations/**", "**/schema*", "**/auth*", "**/*.config.*",
+]
+
+EVENT_FLAG_TO_SKILL = {
+    "debug_required": "systematic-debugging",
+    "parallel_required": "dispatching-parallel-agents",
+    "review_required": "receiving-code-review",
+}
 
 
 def _matches_any(rel: str, globs: list[str]) -> bool:
@@ -58,6 +72,20 @@ def _matches_any(rel: str, globs: list[str]) -> bool:
     return False
 
 
+def _phase_touched_tests(state: State, phase: int) -> bool:
+    touched = state.data.get("phase_files_touched", {}).get(str(phase), [])
+    return any(p.startswith("tests/") or "/tests/" in p for p in touched)
+
+
+def _is_test_file(rel: str) -> bool:
+    return rel.startswith("tests/") or "/tests/" in rel
+
+
+def _targets_include_tests(targets: list[str]) -> bool:
+    """Return True if target_files contains any tests/** pattern."""
+    return any(_matches_any("tests/placeholder.py", [t]) or t.startswith("tests/") for t in targets)
+
+
 def main() -> int:
     raw = sys.stdin.read()
     if not raw.strip():
@@ -76,43 +104,131 @@ def main() -> int:
     except ValueError:
         return 0
 
-    if _matches_any(rel, GLOBAL_WHITELIST_GLOBS):
-        return 0
-
     s = State.load()
     stage = s.data["stage"]
 
+    # 1. event_flags require corresponding skills
+    for flag, required_skill in EVENT_FLAG_TO_SKILL.items():
+        if s.data["event_flags"].get(flag) and not s.has_skill(required_skill):
+            print(format_block(
+                problem=f"event flag {flag} 為 true，必須先呼叫 {required_skill}。",
+                stage=stage,
+                actions=[f"呼叫 Skill(skill=\"{required_skill}\")"],
+            ), file=sys.stderr)
+            return 2
+
+    # 2. .claude/skills/ requires writing-skills
+    if rel.startswith(".claude/skills/") or "/.claude/skills/" in rel:
+        if not s.has_skill("writing-skills"):
+            print(format_block(
+                problem=f"修改 skills 目錄需先 writing-skills（{rel}）。",
+                stage=stage,
+                actions=["呼叫 Skill(skill=\"writing-skills\")"],
+            ), file=sys.stderr)
+            return 2
+        # writing-skills was called → fall through to global whitelist check below
+        # (.claude/** is in whitelist so will pass)
+
+    # 3. Global whitelist passes
+    if _matches_any(rel, GLOBAL_WHITELIST_GLOBS):
+        return 0
+
+    # 4. Stage gating (Phase 2 logic)
     if stage in ("idle", "session-started"):
-        msg = format_block(
-            problem=f"在 stage={stage} 不可 Edit src 檔（{rel}）。先 brainstorm。",
+        print(format_block(
+            problem=f"在 stage={stage} 不可 Edit src（{rel}）。",
             stage=stage,
-            actions=[
-                "呼叫 Skill(skill=\"brainstorming\") 先進設計階段",
-                "或若這是修文件／設定，請放進白名單路徑（docs/、tests/、.claude/、ADR/、*.md、*.css、*.json、*.toml）",
-            ],
-        )
-        print(msg, file=sys.stderr)
+            actions=["呼叫 Skill(skill=\"brainstorming\")"],
+        ), file=sys.stderr)
         return 2
     if stage == "spec-ready":
-        msg = format_block(
-            problem=f"spec-ready 階段不可 Edit src（{rel}）。先 writing-plans。",
+        print(format_block(
+            problem=f"spec-ready 階段不可 Edit src（{rel}）。",
             stage=stage,
             actions=["呼叫 Skill(skill=\"writing-plans\") 把 spec 轉成 plan"],
-        )
-        print(msg, file=sys.stderr)
+        ), file=sys.stderr)
         return 2
     if stage == "plan-ready":
-        msg = format_block(
-            problem=f"plan-ready 階段不可 Edit src（{rel}）。先 executing-plans 或 subagent-driven-development。",
+        print(format_block(
+            problem=f"plan-ready 階段不可 Edit src（{rel}）。",
             stage=stage,
-            actions=[
-                "呼叫 Skill(skill=\"executing-plans\") 進入執行階段",
-                "或 Skill(skill=\"subagent-driven-development\") 用 subagent 執行",
-            ],
-        )
-        print(msg, file=sys.stderr)
+            actions=["呼叫 Skill(skill=\"executing-plans\") 或 Skill(skill=\"subagent-driven-development\")"],
+        ), file=sys.stderr)
         return 2
-    # exec-prep / exec-running / phase-* / reviewed / done — pass for now
+
+    # 5. Exec-stage rules
+    if stage in ("exec-prep", "exec-running") or (stage.startswith("phase-") and stage.endswith("-done")):
+        cur_phase = s.data.get("current_phase") or 0
+        plan_rel = s.data.get("current_plan")
+        targets: list[str] = []
+        if plan_rel:
+            plan_path = project_root() / plan_rel
+            if plan_path.exists():
+                from lib.frontmatter import parse, FrontmatterError
+                try:
+                    fm, _ = parse(plan_path.read_text())
+                    cur = next((p for p in (fm.get("phases") or []) if int(p.get("id", -1)) == cur_phase), None)
+                    if cur:
+                        targets = cur.get("target_files") or []
+                except FrontmatterError:
+                    pass
+
+        # 5a. target_files match → pass (with TDD check)
+        if _matches_any(rel, targets):
+            # TDD: src/** writes require prior tests/** writes in this phase
+            # Only enforce TDD when the plan also includes tests/** in target_files
+            if rel.startswith("src/") and not _is_test_file(rel) and _targets_include_tests(targets):
+                if not _phase_touched_tests(s, cur_phase):
+                    print(format_block(
+                        problem=f"TDD：先寫 test 再寫 src（phase {cur_phase} 未 Edit 任何 tests/）",
+                        stage=stage,
+                        phase=cur_phase,
+                        actions=[
+                            "Skill(skill=\"test-driven-development\")，先寫測試",
+                            "若不需 TDD（例如改文件／設定），請放進白名單路徑",
+                        ],
+                    ), file=sys.stderr)
+                    return 2
+            return 0
+
+        # 5b. sensitive types → block
+        if matches_any(rel, SENSITIVE_GLOBS):
+            print(format_block(
+                problem=f"碰到敏感類型 ({rel})，需新 ADR 解釋。",
+                stage=stage,
+                phase=cur_phase,
+                actions=["新增 ADR 描述此變更原因（schema/auth/config/migration）"],
+            ), file=sys.stderr)
+            return 2
+
+        # 5c/5d. deviation counting
+        unique_files = {d["file"] for d in s.data.get("deviation_log", []) if d.get("phase") == cur_phase}
+        if rel not in unique_files:
+            unique_files.add(rel)
+        new_count = len(unique_files)
+        if new_count >= 3:
+            print(format_block(
+                problem=f"phase {cur_phase} 累計 {new_count} 個 plan 外檔案，需新 ADR。",
+                stage=stage,
+                phase=cur_phase,
+                actions=[
+                    f"新增 ADR 解釋為何要碰 {rel}",
+                    "或若這是預期內變更，把它加進 plan target_files",
+                ],
+            ), file=sys.stderr)
+            return 2
+
+        # 5c. Soft warn (≤2 deviations)
+        s.data["deviation_log"].append({"phase": cur_phase, "file": rel})
+        s.save()
+        print(
+            f"[WARN by dev-rules] 小幅偏離 plan ({rel})，phase {cur_phase} 累計 {new_count}/2。"
+            "建議 commit 加 'Deviation: <原因>'。",
+            file=sys.stderr,
+        )
+        return 0
+
+    # phase-N-verified, all-phases-verified, reviewed, done — pass
     return 0
 
 

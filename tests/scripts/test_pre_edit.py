@@ -74,3 +74,90 @@ def test_pre_edit_passes_adr(tmp_project, set_stage):
     f = tmp_project / "ADR" / "0002-x.md"
     r = run_pre({"tool_name": "Write", "tool_input": {"file_path": str(f)}}, tmp_project)
     assert r.returncode == 0
+
+
+def test_pre_edit_passes_target_file(tmp_project, set_stage):
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("---\nphases:\n  - id: 1\n    target_files:\n      - src/a.py\n---\nbody")
+    set_stage(stage="exec-running", current_plan="docs/superpowers/plans/p.md", current_phase=1)
+    src = tmp_project / "src" / "a.py"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(src)}}, tmp_project)
+    assert r.returncode == 0
+
+
+def test_pre_edit_blocks_sensitive_paths(tmp_project, set_stage):
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("---\nphases:\n  - id: 1\n    target_files:\n      - src/a.py\n---\nbody")
+    set_stage(stage="exec-running", current_plan="docs/superpowers/plans/p.md", current_phase=1)
+    sensitive = tmp_project / "src" / "auth_helper.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(sensitive)}}, tmp_project)
+    assert r.returncode == 2
+    assert "ADR" in r.stderr
+
+
+def test_pre_edit_warns_on_small_deviation(tmp_project, set_stage):
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("---\nphases:\n  - id: 1\n    target_files:\n      - src/a.py\n---\nbody")
+    set_stage(stage="exec-running", current_plan="docs/superpowers/plans/p.md", current_phase=1)
+    extra = tmp_project / "src" / "extra.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(extra)}}, tmp_project)
+    assert r.returncode == 0
+    assert "[WARN" in r.stderr
+
+
+def test_pre_edit_blocks_3rd_deviation(tmp_project, set_stage):
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("---\nphases:\n  - id: 1\n    target_files:\n      - src/a.py\n---\nbody")
+    set_stage(
+        stage="exec-running",
+        current_plan="docs/superpowers/plans/p.md",
+        current_phase=1,
+        deviation_log=[
+            {"phase": 1, "file": "src/x.py"},
+            {"phase": 1, "file": "src/y.py"},
+        ],
+    )
+    third = tmp_project / "src" / "z.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(third)}}, tmp_project)
+    assert r.returncode == 2
+
+
+def test_pre_edit_blocks_skills_dir_until_writing_skills(tmp_project, set_stage):
+    set_stage(stage="exec-running", skills_invoked=[])
+    f = tmp_project / ".claude" / "skills" / "my-skill" / "SKILL.md"
+    r = run_pre({"tool_name": "Write", "tool_input": {"file_path": str(f)}}, tmp_project)
+    assert r.returncode == 2
+    assert "writing-skills" in r.stderr
+
+
+def test_pre_edit_blocks_when_debug_required(tmp_project, set_stage):
+    full = set_stage(stage="exec-running")
+    # set_stage doesn't expose nested updates directly; reload and update
+    sp = tmp_project / ".claude" / "dev-state.json"
+    state = json.loads(sp.read_text())
+    state["event_flags"]["debug_required"] = True
+    sp.write_text(json.dumps(state))
+    src = tmp_project / "src" / "a.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(src)}}, tmp_project)
+    assert r.returncode == 2
+    assert "systematic-debugging" in r.stderr
+
+
+def test_pre_edit_tdd_blocks_src_without_tests(tmp_project, set_stage):
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text(
+        "---\nphases:\n  - id: 1\n"
+        "    target_files:\n      - src/**\n      - tests/**\n"
+        "---\nbody"
+    )
+    set_stage(stage="exec-running", current_plan="docs/superpowers/plans/p.md", current_phase=1)
+    src = tmp_project / "src" / "new_module.py"
+    r = run_pre({"tool_name": "Write", "tool_input": {"file_path": str(src)}}, tmp_project)
+    assert r.returncode == 2
+    assert "test-driven-development" in r.stderr or "TDD" in r.stderr
