@@ -1,0 +1,12 @@
+# Python (hook scripts)
+__pycache__/
+*.pyc
+.venv/
+
+# Claude project local state
+.claude/dev-state.json
+.claude/settings.local.json
+.superpowers/
+
+# OS
+.DS_Store
