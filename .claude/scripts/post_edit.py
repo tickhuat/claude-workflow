@@ -2,7 +2,7 @@
 """PostToolUse: Edit/Write/MultiEdit hook.
 
 責任（Phase 1）：偵測 ADR/*.md 寫入 → 重建 ADR/_index.json。
-Phase 3 會擴充：phase target_files 進度追蹤。
+Phase 3：phase target_files 進度追蹤 → stage transition to phase-N-done。
 """
 from __future__ import annotations
 
@@ -35,11 +35,50 @@ def main() -> int:
         rel = Path(file_path).resolve().relative_to(project_root())
     except ValueError:
         return 0
+
+    # ADR path → rebuild index
     if rel.parts and rel.parts[0] == "ADR" and rel.suffix == ".md":
         try:
             rebuild_index()
         except ADRError as e:
             print(f"[WARN by dev-rules] ADR index rebuild failed: {e}", file=sys.stderr)
+
+    # Phase target_files progress tracking
+    from lib.state import State
+    s = State.load()
+    if s.data["stage"] in ("exec-prep", "exec-running") and s.data.get("current_phase"):
+        from lib.frontmatter import parse, FrontmatterError
+        from lib.glob_match import matches_any
+
+        plan_rel = s.data.get("current_plan")
+        if plan_rel:
+            plan_path = project_root() / plan_rel
+            if plan_path.exists():
+                try:
+                    fm, _ = parse(plan_path.read_text())
+                    phases = fm.get("phases") or []
+                    cur = next(
+                        (p for p in phases if int(p.get("id", -1)) == s.data["current_phase"]),
+                        None,
+                    )
+                    if cur:
+                        targets = cur.get("target_files") or []
+                        rel_str = str(rel)
+                        # Track touched files for current phase
+                        touched_dict = s.data.setdefault("phase_files_touched", {})
+                        touched = touched_dict.setdefault(str(s.data["current_phase"]), [])
+                        if rel_str not in touched and matches_any(rel_str, targets):
+                            touched.append(rel_str)
+                        # All target globs covered?
+                        all_covered = bool(targets) and all(
+                            any(matches_any(t, [g]) for t in touched) for g in targets
+                        )
+                        if all_covered and not s.data["stage"].startswith("phase-"):
+                            s.set_stage(f"phase-{s.data['current_phase']}-done")
+                        s.save()
+                except FrontmatterError:
+                    pass
+
     return 0
 
 

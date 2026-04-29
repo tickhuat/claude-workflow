@@ -53,3 +53,42 @@ def test_post_edit_handles_missing_input(tmp_project):
     )
     # 空 input 不應該爆炸；exit 0 pass-through
     assert r.returncode == 0
+
+
+def test_post_edit_advances_to_phase_done(tmp_project, set_stage):
+    # Plan with phase 1 having two target files
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text(
+        "---\ntitle: P\nadrs: [0001-x]\n"
+        "phases:\n"
+        "  - id: 1\n"
+        "    name: a\n"
+        "    target_files:\n"
+        "      - src/a.py\n"
+        "      - src/b.py\n"
+        "    verify_command: pytest\n"
+        "---\n\nbody"
+    )
+    (tmp_project / "ADR" / "0001-x.md").write_text(
+        "---\nid: 0001\ntitle: X\nstatus: Accepted\n---\n## Decision\nDo.\n"
+    )
+    set_stage(
+        stage="exec-running",
+        current_plan="docs/superpowers/plans/p.md",
+        current_phase=1,
+        phases_total=1,
+    )
+
+    src_a = tmp_project / "src" / "a.py"
+    src_a.parent.mkdir(parents=True, exist_ok=True)
+    src_a.write_text("a")
+    run_hook({"tool_name": "Write", "tool_input": {"file_path": str(src_a)}}, tmp_project)
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["stage"] == "exec-running"  # not yet all touched
+
+    src_b = tmp_project / "src" / "b.py"
+    src_b.write_text("b")
+    run_hook({"tool_name": "Write", "tool_input": {"file_path": str(src_b)}}, tmp_project)
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["stage"] == "phase-1-done"
