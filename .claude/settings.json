@@ -5,7 +5,8 @@
     ],
     "PreToolUse": [
       { "matcher": "Skill", "command": "python3 .claude/scripts/pre_skill.py" },
-      { "matcher": "Edit|Write|MultiEdit", "command": "python3 .claude/scripts/pre_edit.py" }
+      { "matcher": "Edit|Write|MultiEdit", "command": "python3 .claude/scripts/pre_edit.py" },
+      { "matcher": "Bash", "command": "python3 .claude/scripts/pre_bash.py" }
     ],
     "PostToolUse": [
       { "matcher": "Skill|Agent", "command": "python3 .claude/scripts/post_skill.py" },
