@@ -78,3 +78,26 @@ def test_dump_roundtrip_preserves_keys():
     fm, body = parse(text)
     assert fm == original
     assert body == "body"
+
+
+def test_parse_handles_trailing_whitespace_on_closing_fence():
+    text = "---\ntitle: foo\n---   \nbody"
+    fm, body = parse(text)
+    assert fm == {"title": "foo"}
+    # body returned verbatim (including any leading blank lines)
+    assert body == "body"
+
+
+def test_parse_body_verbatim_no_lstrip():
+    text = "---\ntitle: foo\n---\n\n\nbody with two leading blank lines"
+    fm, body = parse(text)
+    assert fm == {"title": "foo"}
+    assert body == "\n\nbody with two leading blank lines"
+
+
+def test_parse_existing_test_still_passes():
+    """Sanity-check the original simple case still works after parse() rewrite."""
+    text = "---\ntitle: Hello\ndate: 2026-04-29\n---\n\nbody"
+    fm, body = parse(text)
+    assert fm == {"title": "Hello", "date": "2026-04-29"}
+    assert "body" in body

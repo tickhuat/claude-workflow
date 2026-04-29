@@ -15,22 +15,20 @@ _FENCE = "---"
 def parse(text: str) -> tuple[dict[str, Any], str]:
     if not text.startswith(_FENCE):
         return {}, text
-    try:
-        if text.startswith(_FENCE + "\n"):
-            _, fm_block, body = text.split(_FENCE + "\n", 2)
-        else:
-            _, fm_block, body = _split_with_eol(text)
-    except ValueError as e:
-        raise FrontmatterError("unterminated frontmatter") from e
+    _, fm_block, body = _split_with_eol(text)
     return _parse_block(fm_block), body
 
 
 def _split_with_eol(text: str) -> tuple[str, str, str]:
     """Handle fence lines that may have trailing whitespace."""
-    parts = re.split(r"^---\s*$", text, maxsplit=2, flags=re.MULTILINE)
+    parts = re.split(r"^---[ \t]*$", text, maxsplit=2, flags=re.MULTILINE)
     if len(parts) != 3:
         raise FrontmatterError("unterminated frontmatter")
-    return parts[0], parts[1].lstrip("\n"), parts[2].lstrip("\n")
+    body = parts[2]
+    # Strip the single newline that terminates the closing fence line
+    if body.startswith("\n"):
+        body = body[1:]
+    return parts[0], parts[1].lstrip("\n"), body
 
 
 def _parse_block(block: str) -> dict[str, Any]:
