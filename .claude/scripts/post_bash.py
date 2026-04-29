@@ -54,6 +54,7 @@ def main() -> int:
         return 0
 
     has_keyword = keyword in msg
+    is_amend = "--amend" in cmd
 
     # If there were deviations and message lacks keyword → record violation
     if deviations and not has_keyword:
@@ -62,10 +63,9 @@ def main() -> int:
             "message_excerpt": msg.splitlines()[0][:200] if msg else "",
             "ts": datetime.now(timezone.utc).isoformat(),
         }
-    else:
-        # No violation now — clear any previous one
-        if s.data.get("last_commit_violation") is not None:
-            s.data["last_commit_violation"] = None
+    elif is_amend and has_keyword and s.data.get("last_commit_violation") is not None:
+        # Only --amend with keyword clears a prior violation (per ADR 0005)
+        s.data["last_commit_violation"] = None
     s.save()
     return 0
 

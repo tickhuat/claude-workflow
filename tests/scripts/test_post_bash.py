@@ -107,6 +107,22 @@ def test_amend_with_keyword_clears_existing_violation(tmp_project):
     assert state.get("last_commit_violation") is None
 
 
+def test_unrelated_clean_commit_does_not_clear_existing_violation(tmp_project):
+    """A non-amend commit (no deviations, has keyword incidentally) must not clear prior violation."""
+    _git_init_with_commit(tmp_project, "feat: phase 2 work, no deviations here")
+    _set_state(
+        tmp_project, stage="exec-running", current_phase=2,
+        deviation_log=[],  # phase 2 has no deviations
+        last_commit_violation={"phase": 1, "message_excerpt": "old", "ts": "2026-04-29T00:00:00Z"},
+    )
+    r = run_post_bash('git commit -m "..."', tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    # Pre-existing phase-1 violation should remain
+    assert state["last_commit_violation"] is not None
+    assert state["last_commit_violation"]["phase"] == 1
+
+
 def test_rebase_in_progress_skips_check(tmp_project):
     _git_init_with_commit(tmp_project, "feat: foo")
     (tmp_project / ".git" / "rebase-merge").mkdir()
