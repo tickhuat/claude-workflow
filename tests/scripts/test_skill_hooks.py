@@ -97,3 +97,28 @@ def test_post_skill_transition_blocked_when_adr_missing(tmp_project):
     run(POST, {"tool_name": "Skill", "tool_input": {"skill": "brainstorming"}}, tmp_project)
     state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
     assert state["stage"] != "spec-ready"
+
+
+def test_pre_skill_blocks_brainstorming_when_adr_unread(tmp_project):
+    # Has ADR but Claude hasn't read them
+    (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
+        {"id": "0001", "title": "X", "status": "Accepted", "file": "0001-x.md", "summary": "..."}
+    ]))
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "brainstorming"}}, tmp_project)
+    assert r.returncode == 2
+    assert "[BLOCKED" in r.stderr
+    assert "0001-x.md" in r.stderr
+
+
+def test_pre_skill_passes_brainstorming_when_no_adrs(tmp_project):
+    # No index file or empty index
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "brainstorming"}}, tmp_project)
+    assert r.returncode == 0
+
+
+def test_pre_skill_passes_other_skills(tmp_project):
+    (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
+        {"id": "0001", "title": "X", "status": "Accepted", "file": "0001-x.md", "summary": "..."}
+    ]))
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "systematic-debugging"}}, tmp_project)
+    assert r.returncode == 0
