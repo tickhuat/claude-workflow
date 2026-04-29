@@ -187,3 +187,30 @@ def test_pre_edit_passes_skills_dir_when_writing_skills_invoked(tmp_project, set
     f = tmp_project / ".claude" / "skills" / "my-skill" / "SKILL.md"
     r = run_pre({"tool_name": "Write", "tool_input": {"file_path": str(f)}}, tmp_project)
     assert r.returncode == 0
+
+
+def test_pre_edit_persists_deviation_to_log(tmp_project, set_stage):
+    """Regression: soft-warn branch must actually write deviation_log."""
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("---\nphases:\n  - id: 1\n    target_files:\n      - src/a.py\n---\nbody")
+    set_stage(stage="exec-running", current_plan="docs/superpowers/plans/p.md", current_phase=1)
+
+    extra1 = tmp_project / "src" / "extra1.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(extra1)}}, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert any(d["file"] == "src/extra1.py" for d in state["deviation_log"]), \
+        f"deviation_log should contain src/extra1.py, got: {state['deviation_log']}"
+
+    extra2 = tmp_project / "src" / "extra2.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(extra2)}}, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    files_in_log = {d["file"] for d in state["deviation_log"] if d.get("phase") == 1}
+    assert files_in_log == {"src/extra1.py", "src/extra2.py"}
+
+    # 3rd unique file → block
+    extra3 = tmp_project / "src" / "extra3.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(extra3)}}, tmp_project)
+    assert r.returncode == 2

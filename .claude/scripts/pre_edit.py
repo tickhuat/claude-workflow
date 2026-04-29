@@ -212,10 +212,9 @@ def main() -> int:
             return 2
 
         # 5c/5d. deviation counting
-        unique_files = {d["file"] for d in s.data.get("deviation_log", []) if d.get("phase") == cur_phase}
-        if rel not in unique_files:
-            unique_files.add(rel)
-        new_count = len(unique_files)
+        already_logged = {d["file"] for d in s.data.get("deviation_log", []) if d.get("phase") == cur_phase}
+        projected_unique = already_logged | {rel}
+        new_count = len(projected_unique)
         if new_count >= 3:
             print(format_block(
                 problem=f"phase {cur_phase} 累計 {new_count} 個 plan 外檔案，需新 ADR。",
@@ -228,8 +227,8 @@ def main() -> int:
             ), file=sys.stderr)
             return 2
 
-        # 5c. Soft warn (≤2 deviations)
-        if rel not in unique_files:
+        # 5c. Soft warn (≤2 deviations) — append only if truly new
+        if rel not in already_logged:
             s.data["deviation_log"].append({"phase": cur_phase, "file": rel})
             s.save()
         print(
