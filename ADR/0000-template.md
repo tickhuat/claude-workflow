@@ -1,5 +1,5 @@
 ---
-id: 0000
+id: "0000"
 title: ADR Template (DO NOT EDIT — copy to start a new ADR)
 status: Template
 date: 2026-04-29

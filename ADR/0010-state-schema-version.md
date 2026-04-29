@@ -1,5 +1,5 @@
 ---
-id: 0010
+id: "0010"
 title: dev-state.json schema_version field for forward-compat migration
 status: Accepted
 date: 2026-04-29

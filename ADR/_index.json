@@ -63,7 +63,7 @@
     "summary": "採用 **A：GitHub Template repo**，搭配 `scripts/init-fresh.sh` 給 fork 後想清掉 dogfood examples 的人用。"
   },
   {
-    "id": "0008",
+    "id": "0010",
     "title": "dev-state.json schema_version field for forward-compat migration",
     "status": "Accepted",
     "file": "0010-state-schema-version.md",
