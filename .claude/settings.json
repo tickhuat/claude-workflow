@@ -103,6 +103,10 @@
       {
         "matcher": "Read",
         "command": "python3 .claude/scripts/post_read.py"
+      },
+      {
+        "matcher": "Bash",
+        "command": "python3 .claude/scripts/post_bash.py"
       }
     ]
   }
