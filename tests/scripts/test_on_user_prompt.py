@@ -42,3 +42,33 @@ def test_corrupt_index_does_not_crash(tmp_project):
     (tmp_project / "ADR" / "_index.json").write_text("not json")
     r = run_hook({"prompt": "hi"}, tmp_project)
     assert r.returncode == 0
+
+
+def test_sets_debug_required_on_bug_word(tmp_project):
+    r = run_hook({"prompt": "I'm hitting a bug in the agent runner"}, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["event_flags"]["debug_required"] is True
+
+
+def test_sets_parallel_required(tmp_project):
+    r = run_hook({"prompt": "幫我同時跑 lint 跟 type check"}, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["event_flags"]["parallel_required"] is True
+
+
+def test_sets_review_required(tmp_project):
+    r = run_hook({"prompt": "see PR comment from teammate"}, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["event_flags"]["review_required"] is True
+
+
+def test_no_flag_when_no_keyword(tmp_project):
+    r = run_hook({"prompt": "可以幫我看一下這段邏輯嗎"}, tmp_project)
+    assert r.returncode == 0
+    state_p = tmp_project / ".claude" / "dev-state.json"
+    if state_p.exists():
+        state = json.loads(state_p.read_text())
+        assert state["event_flags"]["debug_required"] is False

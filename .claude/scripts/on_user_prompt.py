@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit hook：注入 ADR index 摘要到 context。
-
-Phase 1：只注入 index。Phase 3 擴充：偵測字眼設 event_flags。
-"""
+"""UserPromptSubmit hook：注入 ADR index 摘要 + 偵測 event_flags。"""
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -13,32 +11,65 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.adr import index_path  # noqa: E402
+from lib.state import State  # noqa: E402
 
 
-def main() -> int:
-    raw = sys.stdin.read()
-    # event 不必 parse（Phase 1 用不到 prompt 內容）
-    _ = raw
+KEYWORDS = {
+    "debug_required": [r"\bbug\b", r"\berror\b", r"test fail", r"\bexception\b", r"\bcrash\b", r"traceback"],
+    "parallel_required": ["同時", "平行", "多個獨立", r"\bparallel\b"],
+    "review_required": [r"\breview\b", "PR comment", r"\bfeedback\b"],
+}
 
+
+def _detect_flags(prompt: str) -> dict[str, bool]:
+    out = {}
+    for flag, pats in KEYWORDS.items():
+        if any(re.search(p, prompt, flags=re.IGNORECASE) for p in pats):
+            out[flag] = True
+    return out
+
+
+def _print_adr_index() -> None:
     p = index_path()
     print("=== ADR Index (injected by dev-rules) ===")
     if not p.exists():
         print("(empty)")
-        return 0
+        return
     try:
         data = json.loads(p.read_text())
     except json.JSONDecodeError:
         print("(index corrupt — run rebuild)")
-        return 0
+        return
     if not data:
         print("(empty)")
-        return 0
+        return
     for e in data:
         line = f"- {e.get('id', '?')} [{e.get('status', '?')}] {e.get('title', '')} → {e.get('file', '')}"
         summary = e.get("summary") or ""
         if summary:
             line += f" — {summary}"
         print(line)
+
+
+def main() -> int:
+    raw = sys.stdin.read()
+    prompt = ""
+    try:
+        event = json.loads(raw) if raw.strip() else {}
+        prompt = (event.get("prompt") or "") if isinstance(event, dict) else ""
+    except json.JSONDecodeError:
+        pass
+
+    # Set event_flags from keywords
+    flags = _detect_flags(prompt)
+    if flags:
+        s = State.load()
+        for k, v in flags.items():
+            s.data["event_flags"][k] = v
+        s.save()
+
+    # Inject ADR index
+    _print_adr_index()
     return 0
 
 
