@@ -18,6 +18,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.glob_match import matches_any  # noqa: E402
 from lib.messages import format_block  # noqa: E402
 from lib.state import State, project_root  # noqa: E402
@@ -106,6 +107,15 @@ def main() -> int:
 
     s = State.load()
     stage = s.data["stage"]
+
+    if is_bypassed():
+        log_bypass(
+            hook="pre_edit",
+            tool=event.get("tool_name", ""),
+            tool_input=event.get("tool_input") or {},
+            stage=s.data["stage"],
+        )
+        return 0
 
     # 1. event_flags require corresponding skills
     for flag, required_skill in EVENT_FLAG_TO_SKILL.items():

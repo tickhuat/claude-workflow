@@ -14,6 +14,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.adr import index_path  # noqa: E402
+from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.messages import format_block  # noqa: E402
 from lib.state import State  # noqa: E402
 
@@ -33,6 +34,16 @@ def main() -> int:
         return 0
     skill = (event.get("tool_input") or {}).get("skill", "")
     if skill not in _GATED_SKILLS:
+        return 0
+
+    if is_bypassed():
+        s = State.load()
+        log_bypass(
+            hook="pre_skill",
+            tool="Skill",
+            tool_input=event.get("tool_input") or {},
+            stage=s.data["stage"],
+        )
         return 0
 
     p = index_path()
