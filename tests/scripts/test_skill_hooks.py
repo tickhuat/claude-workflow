@@ -99,15 +99,51 @@ def test_post_skill_transition_blocked_when_adr_missing(tmp_project):
     assert state["stage"] != "spec-ready"
 
 
-def test_pre_skill_blocks_brainstorming_when_adr_unread(tmp_project):
-    # Has ADR but Claude hasn't read them
+def test_pre_skill_blocks_when_spec_adrs_not_all_read(tmp_project):
+    """Spec frontmatter lists adrs that aren't in state.adrs_read → block."""
+    spec = tmp_project / "docs" / "superpowers" / "specs" / "2026-04-29-foo.md"
+    spec.parent.mkdir(parents=True, exist_ok=True)
+    spec.write_text("---\ntitle: Foo\nadrs: [0001-x, 0002-y]\n---\nbody")
+    sp = tmp_project / ".claude" / "dev-state.json"
+    sp.parent.mkdir(exist_ok=True)
+    from lib.state import INITIAL_STATE
+    import copy as _copy
+    full = _copy.deepcopy(INITIAL_STATE)
+    full["current_spec"] = "docs/superpowers/specs/2026-04-29-foo.md"
+    full["adrs_read"] = ["0001-x"]  # only one read
+    sp.write_text(json.dumps(full))
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "writing-plans"}}, tmp_project)
+    assert r.returncode == 2
+    assert "0002-y" in r.stderr
+    assert "0001-x" not in r.stderr  # already read, not in remaining list
+
+
+def test_pre_skill_passes_when_all_spec_adrs_read(tmp_project):
+    spec = tmp_project / "docs" / "superpowers" / "specs" / "2026-04-29-foo.md"
+    spec.parent.mkdir(parents=True, exist_ok=True)
+    spec.write_text("---\ntitle: Foo\nadrs: [0001-x, 0002-y]\n---\nbody")
+    sp = tmp_project / ".claude" / "dev-state.json"
+    sp.parent.mkdir(exist_ok=True)
+    from lib.state import INITIAL_STATE
+    import copy as _copy
+    full = _copy.deepcopy(INITIAL_STATE)
+    full["current_spec"] = "docs/superpowers/specs/2026-04-29-foo.md"
+    full["adrs_read"] = ["0001-x", "0002-y"]
+    sp.write_text(json.dumps(full))
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "writing-plans"}}, tmp_project)
+    assert r.returncode == 0
+
+
+def test_pre_skill_brainstorming_blocks_on_index_when_no_spec(tmp_project):
+    """If no spec yet (initial brainstorming), pre_skill falls back to ADR/_index.json."""
+    (tmp_project / "ADR" / "0001-x.md").write_text("---\nid: 0001\ntitle: X\n---\n")
     (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
         {"id": "0001", "title": "X", "status": "Accepted", "file": "0001-x.md", "summary": "..."}
     ]))
+    # No state.adrs_read
     r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "brainstorming"}}, tmp_project)
     assert r.returncode == 2
-    assert "[BLOCKED" in r.stderr
-    assert "0001-x.md" in r.stderr
+    assert "0001-x" in r.stderr
 
 
 def test_pre_skill_passes_brainstorming_when_no_adrs(tmp_project):

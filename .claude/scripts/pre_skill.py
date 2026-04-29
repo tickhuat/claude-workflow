@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""PreToolUse: Skill hook (Phase 2 expanded).
+"""PreToolUse:Skill hook — 對 brainstorming/writing-plans 強檢查 ADR 已讀。
 
-對 brainstorming / writing-plans：若有 ADR 且 state.adrs_read_count 過時，擋並要求先讀。
-其他 skill：pass-through。
+邏輯：
+  若有 current_spec/current_plan：取其 frontmatter `adrs:` 作為 required set
+  否則 fallback 到 ADR/_index.json 的所有 Accepted ADR
+required - state.adrs_read 為空才放行；否則擋並列出還沒讀的 ADR。
 """
 from __future__ import annotations
 
@@ -15,11 +17,40 @@ sys.path.insert(0, str(HERE))
 
 from lib.adr import index_path  # noqa: E402
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
+from lib.frontmatter import FrontmatterError, parse  # noqa: E402
 from lib.messages import format_block  # noqa: E402
-from lib.state import State, StateError  # noqa: E402
+from lib.state import State, StateError, project_root  # noqa: E402
 
 
 _GATED_SKILLS = {"brainstorming", "writing-plans"}
+
+
+def _required_adrs(state: State) -> list[str]:
+    """Return the list of ADR slugs the gated skill needs."""
+    # Prefer current_plan, else current_spec, else fallback to index
+    for key in ("current_plan", "current_spec"):
+        rel = state.data.get(key)
+        if not rel:
+            continue
+        p = project_root() / rel
+        if not p.exists():
+            continue
+        try:
+            fm, _ = parse(p.read_text())
+        except FrontmatterError:
+            continue
+        adrs = fm.get("adrs") or []
+        if isinstance(adrs, list):
+            return [str(s) for s in adrs]
+    # Fallback: all ADRs in _index.json
+    ip = index_path()
+    if not ip.exists():
+        return []
+    try:
+        idx = json.loads(ip.read_text())
+    except json.JSONDecodeError:
+        return []
+    return [e["file"].removesuffix(".md") for e in idx if isinstance(e, dict) and "file" in e]
 
 
 def main() -> int:
@@ -36,34 +67,6 @@ def main() -> int:
     if skill not in _GATED_SKILLS:
         return 0
 
-    if is_bypassed():
-        try:
-            s = State.load()
-        except StateError as e:
-            print(
-                f"[BLOCKED by dev-rules] dev-state.json 損壞：{e}\n"
-                "修復或刪除 .claude/dev-state.json 重置（會丟失目前狀態）。",
-                file=sys.stderr,
-            )
-            return 2
-        log_bypass(
-            hook="pre_skill",
-            tool="Skill",
-            tool_input=event.get("tool_input") or {},
-            stage=s.data["stage"],
-        )
-        return 0
-
-    p = index_path()
-    if not p.exists():
-        return 0
-    try:
-        idx = json.loads(p.read_text())
-    except json.JSONDecodeError:
-        return 0
-    if not idx:
-        return 0
-
     try:
         s = State.load()
     except StateError as e:
@@ -73,22 +76,26 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    last_index_size = s.data.get("adrs_read_count", 0)
-    if last_index_size >= len(idx):
+
+    if is_bypassed():
+        log_bypass(hook="pre_skill", tool="Skill", tool_input=event.get("tool_input") or {}, stage=s.data["stage"])
         return 0
 
-    files = ", ".join(f"ADR/{e['file']}" for e in idx)
-    inline_cmd = (
-        "python3 -c \"import sys; sys.path.insert(0,'.claude/scripts'); "
-        "from lib.state import State; s=State.load(); "
-        f"s.data['adrs_read_count']={len(idx)}; s.save()\""
-    )
+    required = _required_adrs(s)
+    if not required:
+        return 0  # nothing to enforce
+    already_read = set(s.data.get("adrs_read", []))
+    missing = [slug for slug in required if slug not in already_read]
+    if not missing:
+        return 0
+
+    files = ", ".join(f"ADR/{slug}.md" for slug in missing)
     msg = format_block(
-        problem=f"Skill {skill!r} 需先讀完所有 Accepted ADR ({len(idx)} 筆)。",
+        problem=f"Skill {skill!r} 需先讀完相關 ADR（還缺 {len(missing)} 筆）。",
         stage=s.data["stage"],
         actions=[
-            f"Read 以下 ADR 檔：{files}",
-            f"讀完後執行此指令更新 read count，再重新呼叫 Skill：\n     {inline_cmd}",
+            f"用 Read 工具讀以下 ADR：{files}",
+            "讀完後重新呼叫 Skill（PostToolUse:Read 會自動記錄已讀）。",
         ],
     )
     print(msg, file=sys.stderr)
