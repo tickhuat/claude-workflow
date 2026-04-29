@@ -6,6 +6,7 @@ related_specs:
   - docs/superpowers/specs/2026-04-29-dev-rules-enforcement-design.md
 adrs:
   - 0001-adopt-hook-state-machine-enforcement
+  - 0002-pre-skill-manual-adrs-read-count
 phases:
   - id: 1
     name: 基礎框架 + ADR 系統
