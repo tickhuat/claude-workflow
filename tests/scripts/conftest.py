@@ -21,3 +21,21 @@ def tmp_project(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     return tmp_path
+
+
+import json as _json
+
+
+@pytest.fixture
+def set_stage(tmp_project):
+    """Helper to write specific dev-state.json with given stage and overrides."""
+    def _set(**kwargs):
+        from lib.state import INITIAL_STATE
+        import copy as _copy
+        full = _copy.deepcopy(INITIAL_STATE)
+        full.update(kwargs)
+        path = tmp_project / ".claude" / "dev-state.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_json.dumps(full))
+        return full
+    return _set
