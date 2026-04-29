@@ -1,7 +1,9 @@
 # Python (hook scripts)
 __pycache__/
 *.pyc
+*.egg-info/
 .venv/
+.pytest_cache/
 
 # Claude project local state
 .claude/dev-state.json
