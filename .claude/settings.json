@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "command": "python3 .claude/scripts/on_user_prompt.py" }
+    ],
+    "PreToolUse": [
+      { "matcher": "Skill", "command": "python3 .claude/scripts/pre_skill.py" }
+    ],
+    "PostToolUse": [
+      { "matcher": "Skill|Agent", "command": "python3 .claude/scripts/post_skill.py" },
+      { "matcher": "Edit|Write|MultiEdit", "command": "python3 .claude/scripts/post_edit.py" }
+    ]
+  }
+}
