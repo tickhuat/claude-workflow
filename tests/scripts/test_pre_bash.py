@@ -82,3 +82,17 @@ def test_commit_dash_am_with_deviation_requires_note(tmp_project):
     r = run_pre_bash('git commit -am "feat: stuff"', tmp_project)
     assert r.returncode == 2
     assert "Deviation:" in r.stderr
+
+
+def test_commit_keyword_from_config(tmp_project):
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text("commit_deviation_keyword: 'BREAK:'\n")
+    set_state(tmp_project, stage="exec-running", current_phase=1,
+              deviation_log=[{"phase": 1, "file": "src/x.py"}])
+    # Old keyword 'Deviation:' should now be rejected
+    r = run_pre_bash('git commit -m "feat: stuff. Deviation: x"', tmp_project)
+    assert r.returncode == 2
+    assert "BREAK:" in r.stderr
+    # New keyword 'BREAK:' should pass
+    r = run_pre_bash('git commit -m "feat: stuff. BREAK: x"', tmp_project)
+    assert r.returncode == 0

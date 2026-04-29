@@ -11,6 +11,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
+from lib.config import load_config  # noqa: E402
 from lib.messages import format_block  # noqa: E402
 from lib.state import State, StateError  # noqa: E402
 
@@ -53,13 +54,14 @@ def main() -> int:
         msg = m_commit.group(2)
         cur_phase = s.data.get("current_phase") or 0
         deviations = [d for d in s.data.get("deviation_log", []) if d.get("phase") == cur_phase]
-        if deviations and "Deviation:" not in msg:
+        keyword = load_config()["commit_deviation_keyword"]
+        if deviations and keyword not in msg:
             print(format_block(
-                problem=f"phase {cur_phase} 有 {len(deviations)} 筆偏離但 commit message 缺 'Deviation:' 註記。",
+                problem=f"phase {cur_phase} 有 {len(deviations)} 筆偏離但 commit message 缺 '{keyword}' 註記。",
                 stage=s.data["stage"],
                 phase=cur_phase,
                 actions=[
-                    "在 commit message 加 'Deviation: <原因>' 描述為什麼動 plan 外的檔",
+                    f"在 commit message 加 '{keyword} <原因>' 描述為什麼動 plan 外的檔",
                     "或先修掉那些偏離（git restore + commit 不含它們）",
                 ],
             ), file=sys.stderr)
