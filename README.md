@@ -122,6 +122,7 @@ All hook scripts are Python 3 stdlib + PyYAML, sourced from `.claude/scripts/`.
 │   └── plans/                        # writing-plans output
 ├── tests/                            # pytest tests for hooks
 ├── scripts/init-fresh.sh             # strip dogfood examples
+├── .gitignore                        # ignores .claude/dev-state.json + config.local.yaml
 ├── pyproject.toml
 ├── LICENSE
 ├── CLAUDE.md                         # project conventions seen by Claude
