@@ -297,3 +297,43 @@ def test_post_skill_auto_advance_disabled_by_config(tmp_project, set_stage):
     state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
     assert state["stage"] == "phase-1-verified"
     assert state["current_phase"] == 1
+
+
+def test_post_skill_strips_superpowers_namespace_for_state(tmp_project):
+    """E2: namespaced skill 'superpowers:using-superpowers' should record as 'using-superpowers'."""
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "superpowers:using-superpowers"}}, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert "using-superpowers" in state["skills_invoked"]
+    assert "superpowers:using-superpowers" not in state["skills_invoked"]
+    # Stage should advance from idle to session-started (which depends on
+    # _SKILL_TO_STAGE recognising the unprefixed name)
+    assert state["stage"] == "session-started"
+
+
+def test_post_skill_strips_arbitrary_namespace(tmp_project):
+    """E2: any '<namespace>:' prefix gets stripped, not just 'superpowers:'."""
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "myplugin:brainstorming"}}, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert "brainstorming" in state["skills_invoked"]
+
+
+def test_pre_skill_strips_namespace_for_gated_check(tmp_project):
+    """E2: pre_skill recognises 'superpowers:writing-plans' as the gated skill."""
+    # Setup: spec exists with adrs not yet read
+    spec = tmp_project / "docs" / "superpowers" / "specs" / "2026-04-29-x.md"
+    spec.parent.mkdir(parents=True, exist_ok=True)
+    spec.write_text("---\ntitle: X\nadrs: [0001-x]\n---\nbody")
+    sp = tmp_project / ".claude" / "dev-state.json"
+    sp.parent.mkdir(exist_ok=True)
+    from lib.state import INITIAL_STATE
+    import copy as _copy
+    full = _copy.deepcopy(INITIAL_STATE)
+    full["current_spec"] = "docs/superpowers/specs/2026-04-29-x.md"
+    full["adrs_read"] = []
+    sp.write_text(json.dumps(full))
+    # Namespaced writing-plans should be gated (block) the same as bare name
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "superpowers:writing-plans"}}, tmp_project)
+    assert r.returncode == 2
+    assert "0001-x" in r.stderr

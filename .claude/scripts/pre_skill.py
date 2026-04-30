@@ -68,6 +68,8 @@ def main() -> int:
     if event.get("tool_name", "") != "Skill":
         return 0
     skill = (event.get("tool_input") or {}).get("skill", "")
+    if ":" in skill:
+        skill = skill.split(":", 1)[-1]
     if skill not in _GATED_SKILLS:
         return 0
 

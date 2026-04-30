@@ -129,6 +129,8 @@ def main() -> int:
         skill = (event.get("tool_input") or {}).get("skill", "")
         if not skill:
             return 0
+        if ":" in skill:
+            skill = skill.split(":", 1)[-1]
         try:
             s = State.load()
         except StateError as e:
