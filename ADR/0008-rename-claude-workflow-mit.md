@@ -5,7 +5,8 @@ status: Accepted
 date: 2026-04-29
 related_specs:
   - docs/superpowers/specs/2026-04-29-template-ready.md
-related_plans: []
+related_plans:
+  - docs/superpowers/plans/2026-04-29-template-ready.md
 supersedes: null
 ---
 
