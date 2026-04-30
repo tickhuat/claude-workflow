@@ -68,5 +68,19 @@
     "status": "Accepted",
     "file": "0010-state-schema-version.md",
     "summary": "- 在 `INITIAL_STATE` 加 `\"schema_version\": 1`\n- `State.load()` 載入 legacy state（沒 `schema_version`）時，自動補 `schema_version: 1`，stderr 印一行 `[INFO by dev-rules] state schema_version added (was legacy v1)`，不擋\n- 未來 v2 schema 推出時：\n  - `State.load()` 偵測 `schema_version: 1` → 跑 `_migrate_v1_to_v2()` → 寫回 `schema_version: 2`\n  - migrator 函數放 `lib/state.py` 同檔\n  - 每個 v(N+1) migration 都需要新 ADR 紀錄"
+  },
+  {
+    "id": "0011",
+    "title": "Derive ADR id from filename, frontmatter id is advisory only",
+    "status": "Accepted",
+    "file": "0011-derive-adr-id-from-filename.md",
+    "summary": "`rebuild_index()` 改從 **filename** 抓 id：`_FILENAME_RE.match(p.name).group(1)`。frontmatter 的 `id` 欄位降級為 advisory（人類讀的時候方便），不再被引擎信任。"
+  },
+  {
+    "id": "0012",
+    "title": "Strip skill namespace prefix in hook handlers",
+    "status": "Accepted",
+    "file": "0012-strip-skill-namespace-prefix.md",
+    "summary": "在 hook **入口**對 `tool_input.skill` 做 namespace strip："
   }
 ]
