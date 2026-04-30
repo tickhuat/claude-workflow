@@ -67,6 +67,14 @@ class State:
                 file=sys.stderr,
             )
             data["schema_version"] = 1
+            # Persist immediately so subsequent loads don't re-trigger the INFO
+            try:
+                p.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+            except OSError as e:
+                print(
+                    f"[WARN by dev-rules] could not persist schema_version to {p}: {e}",
+                    file=sys.stderr,
+                )
         # 補齊新欄位（向前相容）
         merged = copy.deepcopy(INITIAL_STATE)
         merged.update(data)

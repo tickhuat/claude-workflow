@@ -159,3 +159,25 @@ def test_state_with_existing_schema_version_does_not_warn(tmp_project, capsys):
     assert s.data["schema_version"] == 1
     err = capsys.readouterr().err
     assert "legacy" not in err.lower()
+
+
+def test_legacy_state_auto_fill_persists_to_disk(tmp_project, capsys):
+    """E3: After auto-fill, the next State.load() should NOT print the INFO again
+    because schema_version was written back to the file."""
+    path = tmp_project / ".claude" / "dev-state.json"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps({
+        "stage": "session-started",
+        "skills_invoked": ["using-superpowers"],
+    }))
+    # First load: triggers auto-fill, prints INFO
+    State.load()
+    err1 = capsys.readouterr().err
+    assert "schema_version" in err1 and "legacy" in err1.lower()
+    # Disk file should now have schema_version
+    reloaded = json.loads(path.read_text())
+    assert reloaded["schema_version"] == 1
+    # Second load: file already has schema_version → no INFO
+    State.load()
+    err2 = capsys.readouterr().err
+    assert "legacy" not in err2.lower()
