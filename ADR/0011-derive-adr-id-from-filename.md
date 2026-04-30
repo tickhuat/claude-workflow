@@ -34,4 +34,3 @@ ADR 0001-0007 巧合避開（zfill 後字串等於 filename 數字）；0008、0
 
 - **Positive:** octal trap 永久消除；新 ADR 作者不必記得加引號；filename ↔ id 永遠一致（filename 是 ground truth）
 - **Negative:** frontmatter `id` 與 filename 不同步時行為變了 — 過去引擎會用 frontmatter，現在用 filename + warn。對既有 ADR 沒影響因為都一致
-- **Follow-up:** 一輪 polish 後可考慮把 frontmatter `id` 從 ADR template 與既有 ADRs 整批移除（清掉 advisory cruft）— 留給未來決定

@@ -43,5 +43,4 @@ if ":" in skill:
 ## Consequences
 
 - **Positive:** namespace skills 正確觸發 state transitions、event flag 清除；`dev-state.json` 真實反映進度
-- **Negative:** 兩處（pre_skill + post_skill）要保持同步 strip 邏輯。短期可接受，長期可抽成 lib helper（`lib/skills.py:strip_namespace(s) -> str`）— 留給將來重複夠多時再做
-- **Follow-up:** 本 ADR 落地後再次驗證 dogfood：手動 invoke `Skill(skill="superpowers:using-superpowers")` → 觀察 `dev-state.json` 出現 `using-superpowers` + stage 推到 `session-started`
+- **Negative:** 兩處（pre_skill + post_skill）要保持同步 strip 邏輯。短期可接受，長期可抽成 lib helper（`lib/skills.py:strip_namespace(s) -> str`）— 留給將來重複夠多時再做（`tests/scripts/test_skill_hooks.py` 已有 namespace 與 bare-name 兩種 case 的 regression 覆蓋）
