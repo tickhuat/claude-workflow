@@ -67,7 +67,11 @@ class State:
                 file=sys.stderr,
             )
             data["schema_version"] = 1
-            # Persist immediately so subsequent loads don't re-trigger the INFO
+            # Persist immediately so subsequent loads don't re-trigger the INFO.
+            # Trade-off: if write fails (read-only fs, perms), in-memory state is
+            # still correct and load succeeds, but the next State.load() will
+            # re-print the INFO since the file remained unchanged. The WARN below
+            # surfaces this anomaly without fail-closing the load.
             try:
                 p.write_text(json.dumps(data, indent=2, ensure_ascii=False))
             except OSError as e:

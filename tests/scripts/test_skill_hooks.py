@@ -337,3 +337,14 @@ def test_pre_skill_strips_namespace_for_gated_check(tmp_project):
     r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "superpowers:writing-plans"}}, tmp_project)
     assert r.returncode == 2
     assert "0001-x" in r.stderr
+
+
+def test_post_skill_bare_skill_no_strip_passthrough(tmp_project):
+    """E2 regression: skill name without colon must pass through unchanged
+    (the `if ":" in skill` guard prevents accidental mangling)."""
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "using-superpowers"}}, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    # Bare name is recorded as-is, transitions still fire
+    assert state["skills_invoked"] == ["using-superpowers"]
+    assert state["stage"] == "session-started"

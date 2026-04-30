@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,6 @@ def index_path() -> Path:
 
 
 def rebuild_index() -> None:
-    import sys
     d = adr_dir()
     d.mkdir(parents=True, exist_ok=True)
     entries: list[dict[str, Any]] = []
