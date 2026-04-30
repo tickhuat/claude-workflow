@@ -248,6 +248,16 @@
         ]
       }
     ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/notify.sh subagent_stop"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "hooks": [

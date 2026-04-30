@@ -157,19 +157,32 @@ Optional macOS native notifications fire when:
 
 - A Claude turn finishes (`stop` event)
 - Claude is waiting for your input or permission (`input` event)
+- A subagent task completes (`subagent_stop` event — useful when running
+  many Agent tool calls back-to-back, since `stop` only fires once at the
+  end of the whole turn, not per subagent)
 
-Both default to **OFF**. Toggle by creating / removing flag files in `~/.claude/`:
+All default to **OFF**. Toggle by creating / removing flag files in `~/.claude/`:
 
 ```bash
-# Enable both
-touch ~/.claude/.notify-stop ~/.claude/.notify-input
+# Enable all three
+touch ~/.claude/.notify-stop ~/.claude/.notify-input ~/.claude/.notify-subagent-stop
 
 # Enable only "needs input" (recommended — `stop` fires every turn, can be noisy)
 touch ~/.claude/.notify-input
 
+# Enable input + per-subagent ding (good for long subagent-driven plan executions)
+touch ~/.claude/.notify-input ~/.claude/.notify-subagent-stop
+
 # Disable everything
-rm -f ~/.claude/.notify-stop ~/.claude/.notify-input
+rm -f ~/.claude/.notify-stop ~/.claude/.notify-input ~/.claude/.notify-subagent-stop
 ```
+
+`notify.sh` writes a per-invocation debug record to
+`~/.claude/.notify-debug.log` (timestamp, event, flag presence, osascript
+exit code, stderr). Use it to diagnose "sometimes rings, sometimes doesn't"
+— missing log line means the hook didn't fire (Claude Code event issue);
+present line with non-zero `osa_rc` means osascript itself failed (most
+commonly a notification permission issue under System Settings).
 
 The first notification triggers a macOS permission prompt — allow it under
 **System Settings → Notifications**. After that, changes take effect on the
