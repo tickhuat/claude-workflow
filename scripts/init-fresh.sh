@@ -1,8 +1,26 @@
 #!/usr/bin/env bash
 # init-fresh.sh — strip dogfood examples from a fresh template fork.
-# Keeps: engine (.claude/scripts, lib/, tests/, pyproject.toml, README, LICENSE, CLAUDE.md),
-#        ADR template (0000-template.md), and reset _index.json to [].
-# Removes: spec/plan markdown under docs/superpowers/, ADRs 0001+, runtime state files.
+#
+# WARNING: One-time use. Run this immediately after cloning the template,
+# BEFORE writing any of your own specs/plans/ADRs. It is destructive:
+# any docs/superpowers/{specs,plans}/2026-04-*.md and ADR/[1-9]*.md files
+# will be removed.
+#
+# Keeps:
+#   - .claude/scripts/, .claude/settings.json, .claude/dev-rules.config.yaml
+#   - tests/, pyproject.toml, README.md, LICENSE, CLAUDE.md, .gitignore
+#   - .github/workflows/ (CI), scripts/init-fresh.sh (this file)
+#   - ADR/0000-template.md (template for new ADRs)
+#
+# Removes:
+#   - docs/superpowers/specs/2026-04-*.md
+#   - docs/superpowers/plans/2026-04-*.md
+#   - ADR/*.md except 0000-template.md
+#   - .claude/dev-state.json (if present)
+#   - .claude/bypass.log (if present)
+#
+# Resets:
+#   - ADR/_index.json -> []
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

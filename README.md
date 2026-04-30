@@ -24,6 +24,8 @@ cd my-project
 bash scripts/init-fresh.sh   # cleans dogfood examples
 ```
 
+> **Note:** `init-fresh.sh` is destructive and intended for one-time use immediately after cloning. It removes any `2026-04-*.md` files under `docs/superpowers/` — do not run it after starting your own work.
+
 Or via GitHub UI: click "Use this template" on the repo page.
 
 ### Fork and customize
