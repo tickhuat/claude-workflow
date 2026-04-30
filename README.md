@@ -53,7 +53,9 @@ stateDiagram-v2
     idle --> session_started: using-superpowers
     session_started --> spec_ready: brainstorming + spec w/ adrs
     spec_ready --> plan_ready: writing-plans + plan w/ phases
+    plan_ready --> exec_prep: using-git-worktrees
     plan_ready --> exec_running: executing-plans
+    exec_prep --> exec_running: executing-plans
     exec_running --> phase_N_done: target_files all touched
     phase_N_done --> phase_N_verified: VERIFY-PASS phase=N
     phase_N_verified --> exec_running: auto-advance N+1
@@ -145,6 +147,47 @@ This repo dogfoods its own dev-rules. Browse:
 - [ADR/0001-adopt-hook-state-machine-enforcement.md](ADR/0001-adopt-hook-state-machine-enforcement.md) — the founding architectural decision
 
 These (and other dogfood files in `docs/superpowers/` and `ADR/`) are removed by `scripts/init-fresh.sh` when you start your own project.
+
+## Desktop Notifications (macOS)
+
+Optional macOS native notifications fire when:
+
+- A Claude turn finishes (`stop` event)
+- Claude is waiting for your input or permission (`input` event)
+
+Both default to **OFF**. Toggle by creating / removing flag files in `~/.claude/`:
+
+```bash
+# Enable both
+touch ~/.claude/.notify-stop ~/.claude/.notify-input
+
+# Enable only "needs input" (recommended — `stop` fires every turn, can be noisy)
+touch ~/.claude/.notify-input
+
+# Disable everything
+rm -f ~/.claude/.notify-stop ~/.claude/.notify-input
+```
+
+The first notification triggers a macOS permission prompt — allow it under
+**System Settings → Notifications**. After that, changes take effect on the
+next Claude session restart (hooks are registered at session start).
+
+### Customizing message and sound
+
+Edit [.claude/scripts/notify.sh](.claude/scripts/notify.sh) to change the
+title, message, or sound per event. Built-in macOS sound names: `Glass`,
+`Tink`, `Pop`, `Hero`, `Ping`, `Funk`, `Sosumi`, `Submarine`, `Frog`, `Blow`,
+`Bottle`, `Morse`, `Purr`.
+
+### Use globally (all projects, not just this repo)
+
+The hooks above only fire when Claude Code's cwd is in this repo. To get
+notifications in every project:
+
+1. Copy the script: `cp .claude/scripts/notify.sh ~/.claude/scripts/notify.sh`
+2. Add equivalent `Stop` / `Notification` hooks to `~/.claude/settings.json`,
+   replacing `bash .claude/scripts/notify.sh` with
+   `bash ~/.claude/scripts/notify.sh`.
 
 ## Emergency bypass
 
