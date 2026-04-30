@@ -1,6 +1,114 @@
 {
   "permissions": {
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf ~/*)",
+      "Bash(rm -rf $HOME*)",
+      "Bash(rm -rf ${HOME}*)",
+      "Bash(sudo *)",
+      "Bash(sudo)",
+      "Bash(su *)",
+      "Bash(su)",
+      "Bash(curl * | sh*)",
+      "Bash(curl * | bash*)",
+      "Bash(curl * |sh*)",
+      "Bash(curl * |bash*)",
+      "Bash(wget * | sh*)",
+      "Bash(wget * | bash*)",
+      "Bash(dd if=*)",
+      "Bash(mkfs*)",
+      "Bash(shutdown *)",
+      "Bash(reboot *)",
+      "Bash(halt *)",
+      "Bash(chown -R *)",
+      "Bash(chmod -R 777 *)"
+    ],
     "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "MultiEdit",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(less *)",
+      "Bash(more *)",
+      "Bash(ls)",
+      "Bash(ls *)",
+      "Bash(tree *)",
+      "Bash(pwd)",
+      "Bash(stat *)",
+      "Bash(file *)",
+      "Bash(wc *)",
+      "Bash(du *)",
+      "Bash(df *)",
+      "Bash(grep *)",
+      "Bash(egrep *)",
+      "Bash(fgrep *)",
+      "Bash(rg *)",
+      "Bash(find *)",
+      "Bash(fd *)",
+      "Bash(which *)",
+      "Bash(whereis *)",
+      "Bash(type *)",
+      "Bash(echo *)",
+      "Bash(printf *)",
+      "Bash(env)",
+      "Bash(printenv *)",
+      "Bash(date)",
+      "Bash(date *)",
+      "Bash(whoami)",
+      "Bash(id)",
+      "Bash(uname *)",
+      "Bash(hostname)",
+      "Bash(ps *)",
+      "Bash(top *)",
+      "Bash(history *)",
+      "Bash(diff *)",
+      "Bash(cmp *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(cut *)",
+      "Bash(awk *)",
+      "Bash(jq *)",
+      "Bash(yq *)",
+      "Bash(xxd *)",
+      "Bash(md5sum *)",
+      "Bash(sha256sum *)",
+      "Bash(realpath *)",
+      "Bash(readlink *)",
+      "Bash(basename *)",
+      "Bash(dirname *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git show)",
+      "Bash(git show *)",
+      "Bash(git blame *)",
+      "Bash(git ls-files *)",
+      "Bash(git ls-tree *)",
+      "Bash(git branch)",
+      "Bash(git branch -a)",
+      "Bash(git branch -v)",
+      "Bash(git remote)",
+      "Bash(git remote -v)",
+      "Bash(git remote show *)",
+      "Bash(git rev-parse *)",
+      "Bash(git describe *)",
+      "Bash(git for-each-ref *)",
+      "Bash(git reflog *)",
+      "Bash(git shortlog *)",
+      "Bash(git stash list)",
+      "Bash(git stash show *)",
+      "Bash(git tag)",
+      "Bash(git tag -l *)",
+      "Bash(git config --get *)",
+      "Bash(git config --list)",
       "Bash(pytest)",
       "Bash(pytest *)",
       "Bash(coverage *)",
@@ -34,7 +142,6 @@
       "Bash(curl *)",
       "Bash(wget *)",
       "Bash(git add *)",
-      "Bash(git commit *)",
       "Bash(git checkout *)",
       "Bash(git switch *)",
       "Bash(git branch *)",
@@ -44,69 +151,111 @@
       "Bash(git restore *)",
       "Bash(git rm *)",
       "Bash(git reset *)",
-      "Bash(git push *)",
-      "Bash(git merge *)",
       "Bash(git rebase *)",
       "Bash(git cherry-pick *)",
       "Bash(git revert *)",
       "Bash(git clone *)",
       "Bash(git tag *)",
       "Bash(git config *)",
-      "Bash(gh *)",
-      "Bash(python3 -m pytest)",
-      "Bash(python3 -m pip show pytest)",
-      "Bash(python3 -m pip install --user --dry-run pyyaml)",
-      "Bash(python3 -c \"import yaml; print\\('yaml', yaml.__version__\\)\")",
-      "Bash(python3 -m pytest tests/ -q)",
-      "Bash(python3 -m pytest tests/ -q --tb=no)",
-      "Bash(python3 -m pytest tests/scripts/test_frontmatter.py -v)",
-      "Bash(python3 -c ' *)",
-      "Bash(python3 -m pytest tests/scripts/test_config.py -v)",
-      "Bash(python3 -m pytest tests/)",
-      "Bash(git -C /Users/leetickhuat/Workspace/everyday-agent status)",
-      "Bash(git -C /Users/leetickhuat/Workspace/everyday-agent add .claude/scripts/lib/config.py tests/scripts/test_config.py)",
-      "Bash(git -C /Users/leetickhuat/Workspace/everyday-agent commit -m ' *)",
-      "Bash(git -C /Users/leetickhuat/Workspace/everyday-agent show --stat HEAD)",
-      "Bash(python3 -m pytest tests/scripts/test_pre_edit.py -v)",
-      "Bash(python3 -m pytest tests/scripts/test_pre_edit.py::test_pre_edit_respects_custom_sensitive_globs -v)"
+      "Bash(gh *)"
     ]
   },
   "hooks": {
     "UserPromptSubmit": [
       {
-        "command": "python3 .claude/scripts/on_user_prompt.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/on_user_prompt.py"
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Skill",
-        "command": "python3 .claude/scripts/pre_skill.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/pre_skill.py"
+          }
+        ]
       },
       {
         "matcher": "Edit|Write|MultiEdit",
-        "command": "python3 .claude/scripts/pre_edit.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/pre_edit.py"
+          }
+        ]
       },
       {
         "matcher": "Bash",
-        "command": "python3 .claude/scripts/pre_bash.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/pre_bash.py"
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Skill|Agent",
-        "command": "python3 .claude/scripts/post_skill.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/post_skill.py"
+          }
+        ]
       },
       {
         "matcher": "Edit|Write|MultiEdit",
-        "command": "python3 .claude/scripts/post_edit.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/post_edit.py"
+          }
+        ]
       },
       {
         "matcher": "Read",
-        "command": "python3 .claude/scripts/post_read.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/post_read.py"
+          }
+        ]
       },
       {
         "matcher": "Bash",
-        "command": "python3 .claude/scripts/post_bash.py"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/scripts/post_bash.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/notify.sh stop"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/notify.sh input"
+          }
+        ]
       }
     ]
   }
