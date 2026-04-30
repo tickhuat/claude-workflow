@@ -92,3 +92,42 @@ def test_rebuild_index_decision_without_terminal_punctuation(tmp_project):
     idx = json.loads((tmp_project / "ADR" / "_index.json").read_text())
     assert len(idx) == 1
     assert idx[0]["summary"] == "Take the action without ending punctuation"
+
+
+def test_rebuild_index_uses_filename_for_id_not_frontmatter(tmp_project):
+    """E1: id comes from filename digits, not frontmatter."""
+    p = tmp_project / "ADR" / "0099-x.md"
+    p.write_text(
+        "---\nid: bogus-frontmatter-id\ntitle: X\nstatus: Accepted\n---\n\n"
+        "## Decision\nDo X.\n"
+    )
+    rebuild_index()
+    idx = json.loads((tmp_project / "ADR" / "_index.json").read_text())
+    assert len(idx) == 1
+    assert idx[0]["id"] == "0099"  # from filename, not frontmatter
+
+
+def test_rebuild_index_warns_on_id_mismatch(tmp_project, capsys):
+    """E1: frontmatter id mismatching filename → stderr WARN, but use filename."""
+    p = tmp_project / "ADR" / "0042-y.md"
+    p.write_text(
+        "---\nid: \"0099\"\ntitle: Y\nstatus: Accepted\n---\n\n"
+        "## Decision\nDo Y.\n"
+    )
+    rebuild_index()
+    idx = json.loads((tmp_project / "ADR" / "_index.json").read_text())
+    assert idx[0]["id"] == "0042"
+    err = capsys.readouterr().err
+    assert "0042" in err and "0099" in err
+    assert "WARN" in err.upper()
+
+
+def test_rebuild_index_missing_frontmatter_id_is_ok(tmp_project):
+    """E1: frontmatter without `id` is fine; use filename."""
+    p = tmp_project / "ADR" / "0007-z.md"
+    p.write_text(
+        "---\ntitle: Z\nstatus: Accepted\n---\n\n## Decision\nDo Z.\n"
+    )
+    rebuild_index()
+    idx = json.loads((tmp_project / "ADR" / "_index.json").read_text())
+    assert idx[0]["id"] == "0007"

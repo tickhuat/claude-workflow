@@ -26,12 +26,15 @@ def index_path() -> Path:
 
 
 def rebuild_index() -> None:
+    import sys
     d = adr_dir()
     d.mkdir(parents=True, exist_ok=True)
     entries: list[dict[str, Any]] = []
     for p in sorted(d.glob("*.md")):
-        if not _FILENAME_RE.match(p.name):
+        m = _FILENAME_RE.match(p.name)
+        if not m:
             continue
+        filename_id = m.group(1)  # 4-digit string from filename — source of truth
         try:
             fm, body = parse(p.read_text())
         except FrontmatterError as e:
@@ -40,8 +43,19 @@ def rebuild_index() -> None:
             raise ADRError(f"missing frontmatter in {p}")
         if str(fm.get("status", "")).lower() == "template":
             continue
+        # Frontmatter id is advisory; warn on mismatch but use filename
+        fm_id_raw = fm.get("id")
+        if fm_id_raw is not None:
+            fm_id_str = str(fm_id_raw).zfill(4)
+            if fm_id_str != filename_id:
+                print(
+                    f"[WARN by dev-rules] ADR file '{p.name}' frontmatter id="
+                    f"{fm_id_raw!r} mismatches filename id={filename_id!r}; "
+                    "using filename.",
+                    file=sys.stderr,
+                )
         entries.append({
-            "id": str(fm.get("id", "")).zfill(4),
+            "id": filename_id,
             "title": fm.get("title", ""),
             "status": fm.get("status", ""),
             "file": p.name,
