@@ -134,3 +134,31 @@ def test_push_passes_when_violation_cleared(tmp_project):
     set_state(tmp_project, stage="done", last_commit_violation=None)
     r = run_pre_bash("git push origin main", tmp_project)
     assert r.returncode == 0
+
+
+def test_push_branch_named_main_fix_passes(tmp_project):
+    """Regression for W2: push to a branch whose name contains 'main' must not be blocked."""
+    set_state(tmp_project, stage="exec-running")  # earlier than done — main push would block
+    r = run_pre_bash("git push origin feat/main-fix", tmp_project)
+    assert r.returncode == 0, f"feat/main-fix push wrongly blocked: stderr={r.stderr!r}"
+
+
+def test_push_main_via_refspec_still_blocked(tmp_project):
+    """Sanity: `git push origin HEAD:main` should still be detected as pushing to main."""
+    set_state(tmp_project, stage="exec-running")
+    r = run_pre_bash("git push origin HEAD:main", tmp_project)
+    assert r.returncode == 2
+    assert "main" in r.stderr.lower()
+
+
+def test_merge_main_still_blocked(tmp_project):
+    set_state(tmp_project, stage="exec-running")
+    r = run_pre_bash("git merge main", tmp_project)
+    assert r.returncode == 2
+
+
+def test_merge_branch_with_main_in_name_passes(tmp_project):
+    """Regression: `git merge feat/main-fix` is not merging main."""
+    set_state(tmp_project, stage="exec-running")
+    r = run_pre_bash("git merge feat/main-fix", tmp_project)
+    assert r.returncode == 0
