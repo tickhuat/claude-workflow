@@ -125,3 +125,29 @@ def test_parse_git_command_push_no_args():
     r = parse_git_command("git push")
     assert r["subcommand"] == "push"
     assert r["dst_ref"] is None
+
+
+def test_parse_git_command_push_delete_remote_branch():
+    """`git push origin :main` (delete-remote syntax) — current behavior pins
+    that the non-empty side after partition is returned. For W2's "block push
+    to main" use case, treating delete-of-main as a hit is acceptable; if
+    semantics change (e.g. distinguish delete from push), this test should
+    fail and force a deliberate update."""
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git push origin :main")
+    assert r["subcommand"] == "push"
+    assert r["dst_ref"] == "main"  # Current behavior: partition picks 'main' as dst
+
+
+def test_parse_git_command_push_repo_flag_value_misclassified():
+    """`git push --repo <remote>`: the flag's separate value token causes
+    the parser to have only one positional (the flag value), which is below
+    the minimum needed for a refspec. This is the documented limitation in
+    parse_git_command's docstring (flags-that-take-values not handled). If
+    Task 2.2 or later turns out to need this corrected, this test will fail
+    and force a deliberate update with proper flag-value handling."""
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git push --repo origin")
+    # Current limitation: only one positional, so no refspec extracted
+    assert r["subcommand"] == "push"
+    assert r["dst_ref"] is None
