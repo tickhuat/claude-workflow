@@ -82,5 +82,12 @@
     "status": "Accepted",
     "file": "0012-strip-skill-namespace-prefix.md",
     "summary": "在 hook **入口**對 `tool_input.skill` 做 namespace strip："
+  },
+  {
+    "id": "0013",
+    "title": "Stage name validation in set_stage; remove unused can_transition",
+    "status": "Accepted",
+    "file": "0013-stage-name-validation.md",
+    "summary": "把 `lib/state.py` 重構成「stage name 是受驗證的型別」："
   }
 ]
