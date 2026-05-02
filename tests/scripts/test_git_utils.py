@@ -62,3 +62,66 @@ def test_is_in_rebase_apply_variant(tmp_path):
     from lib.git_utils import is_in_rebase
     (tmp_path / ".git" / "rebase-apply").mkdir()
     assert is_in_rebase(tmp_path) is True
+
+
+def test_parse_git_command_push_to_main():
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git push origin main")
+    assert r["subcommand"] == "push"
+    assert r["dst_ref"] == "main"
+
+
+def test_parse_git_command_push_branch_with_main_in_name_is_not_main():
+    """Regression for W2: branch named feat/main-fix must NOT be classified as main."""
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git push origin feat/main-fix")
+    assert r["subcommand"] == "push"
+    assert r["dst_ref"] == "feat/main-fix"
+
+
+def test_parse_git_command_push_with_refspec():
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git push origin HEAD:main")
+    assert r["subcommand"] == "push"
+    assert r["dst_ref"] == "main"
+
+
+def test_parse_git_command_merge_target():
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git merge main")
+    assert r["subcommand"] == "merge"
+    assert r["target_ref"] == "main"
+
+
+def test_parse_git_command_commit_amend_flag():
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git commit --amend -m 'msg'")
+    assert r["subcommand"] == "commit"
+    assert r["amend"] is True
+
+
+def test_parse_git_command_commit_no_amend():
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git commit -m 'msg'")
+    assert r["subcommand"] == "commit"
+    assert r["amend"] is False
+
+
+def test_parse_git_command_non_git_returns_none():
+    from lib.git_utils import parse_git_command
+    assert parse_git_command("ls -la") is None
+    assert parse_git_command("echo git push origin main") is None
+
+
+def test_parse_git_command_malformed_quoting_returns_none():
+    """shlex.split fails on unbalanced quotes — return None for safe pass-through."""
+    from lib.git_utils import parse_git_command
+    assert parse_git_command("git commit -m 'unbalanced") is None
+
+
+def test_parse_git_command_push_no_args():
+    """`git push` with no remote/refspec — dst_ref is None."""
+    from lib.git_utils import parse_git_command
+    r = parse_git_command("git push")
+    assert r["subcommand"] == "push"
+    assert r["dst_ref"] is None
