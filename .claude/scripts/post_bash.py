@@ -30,7 +30,9 @@ def main() -> int:
         return 0
     # Skip failed commits
     resp = event.get("tool_response") or {}
-    if isinstance(resp, dict) and resp.get("exit_code") not in (0, None):
+    # exit_code: 0 = success (continue checking); None = unknown event shape (skip);
+    # anything else = failed commit (skip).
+    if not isinstance(resp, dict) or resp.get("exit_code") != 0:
         return 0
     # Skip during rebase (multiple commits expected, user is rewriting history)
     cwd = project_root()
