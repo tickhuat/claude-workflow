@@ -162,3 +162,22 @@ def test_merge_branch_with_main_in_name_passes(tmp_project):
     set_state(tmp_project, stage="exec-running")
     r = run_pre_bash("git merge feat/main-fix", tmp_project)
     assert r.returncode == 0
+
+
+def test_merge_origin_main_passes_as_sync_operation(tmp_project):
+    """Pin behavior: `git merge origin/main` (syncing upstream main into a feature
+    branch) is NOT considered "landing on main" — it pulls upstream changes into
+    the current branch, not the other way around. This is a deliberate semantic
+    narrowing introduced in Task 2.2: the old regex blocked any \\bmain\\b match
+    anywhere in the command; the new shlex-based parser only blocks exact
+    target_ref ("main" or "master")."""
+    set_state(tmp_project, stage="exec-running")
+    r = run_pre_bash("git merge origin/main", tmp_project)
+    assert r.returncode == 0, f"merge origin/main wrongly blocked: stderr={r.stderr!r}"
+
+
+def test_merge_upstream_main_passes_as_sync_operation(tmp_project):
+    """Same rationale as above for `upstream/main` remote."""
+    set_state(tmp_project, stage="exec-running")
+    r = run_pre_bash("git merge upstream/main", tmp_project)
+    assert r.returncode == 0
