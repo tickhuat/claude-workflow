@@ -42,6 +42,12 @@ def _required_adrs(state: State) -> list[str]:
         adrs = fm.get("adrs") or []
         if isinstance(adrs, list):
             return [str(s) for s in adrs]
+        # adrs present but wrong shape (e.g. bare string) — warn loudly so user notices
+        print(
+            f"[WARN by dev-rules] frontmatter 'adrs' must be a list "
+            f"(got {type(adrs).__name__}); skipping. See ADR/0000-template.md for format.",
+            file=sys.stderr,
+        )
     # Fallback: all ADRs in _index.json
     ip = index_path()
     if not ip.exists():

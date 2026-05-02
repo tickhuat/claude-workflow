@@ -348,3 +348,34 @@ def test_post_skill_bare_skill_no_strip_passthrough(tmp_project):
     # Bare name is recorded as-is, transitions still fire
     assert state["skills_invoked"] == ["using-superpowers"]
     assert state["stage"] == "session-started"
+
+
+def test_pre_skill_warns_when_adrs_is_string(tmp_project):
+    """W18: spec frontmatter with `adrs: "0001-foo"` (string instead of list) must warn."""
+    # Need an ADR that exists so the fallback path doesn't kick in
+    (tmp_project / "ADR").mkdir(exist_ok=True)
+    (tmp_project / "ADR" / "0001-foo.md").write_text(
+        "---\nid: 0001\ntitle: Foo\nstatus: Accepted\n---\n\n## Decision\nDo.\n"
+    )
+    spec = tmp_project / "docs" / "superpowers" / "specs" / "bad.md"
+    spec.parent.mkdir(parents=True, exist_ok=True)
+    spec.write_text("---\ntitle: Bad\nadrs: 0001-foo\n---\nbody")
+    # Set state to point current_spec at this bad-shape spec
+    state_p = tmp_project / ".claude" / "dev-state.json"
+    state_p.parent.mkdir(exist_ok=True)
+    state_p.write_text(json.dumps({
+        "schema_version": 1,
+        "stage": "session-started",
+        "current_spec": "docs/superpowers/specs/bad.md",
+        "current_plan": None,
+        "skills_invoked": [],
+        "adrs_read": [],
+        "deviation_log": [],
+        "event_flags": {"debug_required": False, "parallel_required": False, "review_required": False},
+    }))
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "brainstorming"}}, tmp_project)
+    # Hook should not block (because adrs unparseable — falls back to safe path),
+    # but stderr should contain a WARN about the wrong shape
+    assert "[WARN by dev-rules]" in r.stderr
+    assert "adrs" in r.stderr
+    assert "list" in r.stderr.lower()
