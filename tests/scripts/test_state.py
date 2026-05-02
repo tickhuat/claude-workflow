@@ -75,23 +75,7 @@ def test_load_forward_compat_partial_event_flags(tmp_project):
     assert s.data["event_flags"]["review_required"] is False
 
 
-from lib.state import VALID_STAGES, can_transition, next_stage_after_skill
-
-
-def test_valid_stages_includes_full_lifecycle():
-    for s in [
-        "idle", "session-started", "spec-ready", "plan-ready",
-        "exec-prep", "exec-running", "phase-1-done", "phase-1-verified",
-        "all-phases-verified", "reviewed", "done",
-    ]:
-        assert s in VALID_STAGES
-
-
-def test_can_transition_forward_only():
-    assert can_transition("idle", "session-started") is True
-    assert can_transition("spec-ready", "plan-ready") is True
-    assert can_transition("plan-ready", "spec-ready") is False
-    assert can_transition("idle", "plan-ready") is False  # 不能跳關
+from lib.state import next_stage_after_skill
 
 
 def test_next_stage_after_skill_brainstorming():

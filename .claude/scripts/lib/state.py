@@ -104,21 +104,6 @@ class State:
         return skill in self.data["skills_invoked"]
 
 
-VALID_STAGES: list[str] = [
-    "idle",
-    "session-started",
-    "spec-ready",
-    "plan-ready",
-    "exec-prep",
-    "exec-running",
-    "phase-1-done",      # concrete phase-1 entries to satisfy test
-    "phase-1-verified",
-    "all-phases-verified",
-    "reviewed",
-    "done",
-]
-
-
 # linear forward order; phase-N-* 由 transition 邏輯處理
 _STAGE_ORDER = {s: i for i, s in enumerate([
     "idle", "session-started", "spec-ready", "plan-ready",
@@ -138,29 +123,6 @@ def is_valid_stage(s: str) -> bool:
     if s in _STAGE_ORDER:
         return True
     return bool(_PHASE_STAGE_RE.match(s))
-
-
-def can_transition(src: str, dst: str) -> bool:
-    """允許正向相鄰 transition；phase-N-* 視為 exec-running 內部循環。"""
-    if src == dst:
-        return False
-    if src.startswith("phase-") or dst.startswith("phase-"):
-        return _phase_transition_allowed(src, dst)
-    if src not in _STAGE_ORDER or dst not in _STAGE_ORDER:
-        return False
-    return _STAGE_ORDER[dst] == _STAGE_ORDER[src] + 1
-
-
-def _phase_transition_allowed(src: str, dst: str) -> bool:
-    if src == "exec-running" and dst.endswith("-done") and dst.startswith("phase-"):
-        return True
-    if src.endswith("-done") and dst.endswith("-verified") and src[:-5] == dst[:-9]:
-        return True
-    if src.endswith("-verified") and dst == "exec-running":
-        return True
-    if src.endswith("-verified") and dst == "all-phases-verified":
-        return True
-    return False
 
 
 _SKILL_TO_STAGE: dict[str, dict[str, str | None]] = {
