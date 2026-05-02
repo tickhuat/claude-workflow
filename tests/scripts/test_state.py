@@ -181,3 +181,37 @@ def test_legacy_state_auto_fill_persists_to_disk(tmp_project, capsys):
     State.load()
     err2 = capsys.readouterr().err
     assert "legacy" not in err2.lower()
+
+
+def test_is_valid_stage_accepts_lifecycle_stages():
+    from lib.state import is_valid_stage
+    for s in [
+        "idle", "session-started", "spec-ready", "plan-ready",
+        "exec-prep", "exec-running", "all-phases-verified", "reviewed", "done",
+    ]:
+        assert is_valid_stage(s) is True, f"{s} should be valid"
+
+
+def test_is_valid_stage_accepts_phase_done_and_verified():
+    from lib.state import is_valid_stage
+    assert is_valid_stage("phase-1-done") is True
+    assert is_valid_stage("phase-1-verified") is True
+    assert is_valid_stage("phase-99-done") is True
+    assert is_valid_stage("phase-99-verified") is True
+
+
+def test_is_valid_stage_rejects_garbage():
+    from lib.state import is_valid_stage
+    assert is_valid_stage("garbage") is False
+    assert is_valid_stage("phase-1-vrified") is False  # typo
+    assert is_valid_stage("phase-0-done") is False  # phase id 從 1 起
+    assert is_valid_stage("phase--done") is False
+    assert is_valid_stage("phase-abc-done") is False
+    assert is_valid_stage("") is False
+    assert is_valid_stage("phase-1-done ") is False  # 多空格
+
+
+def test_set_stage_raises_on_invalid_stage(tmp_project):
+    s = State.load()
+    with pytest.raises(AssertionError):
+        s.set_stage("phase-1-vrified")

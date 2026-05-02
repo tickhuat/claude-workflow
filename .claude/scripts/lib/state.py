@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -95,6 +96,7 @@ class State:
             self.data["skills_invoked"].append(skill)
 
     def set_stage(self, new_stage: str) -> None:
+        assert is_valid_stage(new_stage), f"invalid stage: {new_stage!r}"
         self.data["stage"] = new_stage
         self.data["last_transition"] = datetime.now(timezone.utc).isoformat()
 
@@ -122,6 +124,20 @@ _STAGE_ORDER = {s: i for i, s in enumerate([
     "idle", "session-started", "spec-ready", "plan-ready",
     "exec-prep", "exec-running", "all-phases-verified", "reviewed", "done",
 ])}
+
+_PHASE_STAGE_RE = re.compile(r"^phase-([1-9][0-9]*)-(done|verified)$")
+
+
+def is_valid_stage(s: str) -> bool:
+    """Return True iff s is a recognised stage name.
+
+    Recognised stages:
+    - lifecycle stages in _STAGE_ORDER (idle, session-started, ..., done)
+    - phase-N-done / phase-N-verified where N is a positive integer
+    """
+    if s in _STAGE_ORDER:
+        return True
+    return bool(_PHASE_STAGE_RE.match(s))
 
 
 def can_transition(src: str, dst: str) -> bool:
