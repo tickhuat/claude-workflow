@@ -131,3 +131,37 @@ def test_rebuild_index_missing_frontmatter_id_is_ok(tmp_project):
     rebuild_index()
     idx = json.loads((tmp_project / "ADR" / "_index.json").read_text())
     assert idx[0]["id"] == "0007"
+
+
+def test_rebuild_index_warns_on_missing_decision_header(tmp_project, capsys):
+    """ADR without '## Decision' header → stderr WARN naming the file,
+    but rebuild_index still completes (doesn't raise)."""
+    p = tmp_project / "ADR" / "0001-no-decision.md"
+    p.write_text(
+        "---\nid: 0001\ntitle: No Decision\nstatus: Accepted\n---\n\n"
+        "## Context\nctx\n\n## What We Decided\nbody text\n"
+    )
+    rebuild_index()
+    err = capsys.readouterr().err
+    assert "0001-no-decision.md" in err
+    assert "Decision" in err
+    assert "WARN" in err.upper()
+    # Index is still built (not blocked):
+    idx = json.loads((tmp_project / "ADR" / "_index.json").read_text())
+    assert len(idx) == 1
+    assert idx[0]["id"] == "0001"
+
+
+def test_rebuild_index_no_warn_on_well_formed_adr(tmp_project, capsys):
+    """ADR with proper '## Decision' header → no Decision-related WARN."""
+    write_adr(tmp_project, "0001-good", {
+        "id": "0001",
+        "title": "Good",
+        "status": "Accepted",
+    }, decision="A clear decision.")
+    rebuild_index()
+    err = capsys.readouterr().err
+    # No WARN about missing Decision header. (Other WARNs unrelated to
+    # Decision header are tolerated — e.g. id mismatch — but here we
+    # control the input so there shouldn't be any.)
+    assert "Decision" not in err or "WARN" not in err.upper()

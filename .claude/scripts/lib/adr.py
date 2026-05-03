@@ -54,6 +54,13 @@ def rebuild_index() -> None:
                     "using filename.",
                     file=sys.stderr,
                 )
+        if not _has_decision_header(body):
+            print(
+                f"[WARN by dev-rules] {p.name}: missing '## Decision' "
+                "header; summary will be empty. Please follow "
+                "ADR/0000-template.md.",
+                file=sys.stderr,
+            )
         entries.append({
             "id": filename_id,
             "title": fm.get("title", ""),
@@ -64,9 +71,23 @@ def rebuild_index() -> None:
     index_path().write_text(json.dumps(entries, indent=2, ensure_ascii=False))
 
 
+_DECISION_HEADER_RE = re.compile(r"^##\s+Decision\s*$", flags=re.MULTILINE)
+
+
+def _has_decision_header(body: str) -> bool:
+    """True if body contains a '## Decision' section header."""
+    return bool(_DECISION_HEADER_RE.search(body))
+
+
 def _extract_decision_summary(body: str) -> str:
-    """取 ## Decision 段第一個非空段落首句。"""
-    m = re.search(r"^##\s+Decision\s*$", body, flags=re.MULTILINE)
+    """取 ## Decision 段第一個非空段落首句。
+
+    Returns "" if the header is missing — caller (rebuild_index) is
+    responsible for emitting a WARN with file context. Keeping this
+    helper a pure function (no side effects) makes it trivially
+    testable.
+    """
+    m = _DECISION_HEADER_RE.search(body)
     if not m:
         return ""
     rest = body[m.end():]
