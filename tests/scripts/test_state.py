@@ -199,3 +199,81 @@ def test_set_stage_raises_on_invalid_stage(tmp_project):
     s = State.load()
     with pytest.raises(AssertionError):
         s.set_stage("phase-1-vrified")
+
+
+import threading
+
+
+def test_concurrent_load_returns_consistent_snapshot(tmp_project):
+    """Loaders running concurrently with a writer must each see a complete,
+    parseable snapshot — never a partial mid-write file. flock LOCK_SH
+    waits for any in-flight LOCK_EX writer.
+    """
+    s = State.load()
+    s.data["skills_invoked"] = ["foo", "bar"]
+    s.save()
+
+    sp = tmp_project / ".claude" / "dev-state.json"
+    barrier = threading.Barrier(6)  # 5 readers + 1 writer
+    results = []
+    writer_done = threading.Event()
+
+    def reader():
+        barrier.wait()
+        try:
+            loaded = State.load()
+            results.append(loaded.data["skills_invoked"])
+        except Exception as e:
+            results.append(f"ERROR: {e!r}")
+
+    def writer():
+        barrier.wait()
+        # Mutate to a longer payload to maximise chance of mid-write read
+        for i in range(10):
+            loaded = State.load()
+            loaded.data["skills_invoked"] = [f"item-{j}" for j in range(50)]
+            loaded.save()
+        writer_done.set()
+
+    threads = [threading.Thread(target=reader) for _ in range(5)] + [threading.Thread(target=writer)]
+    for t in threads: t.start()
+    for t in threads: t.join()
+
+    # Every reader saw a valid (parseable) snapshot — no JSONDecodeError.
+    # Each result is either the original ["foo","bar"] or one of the writer's
+    # snapshots (a list of length 50). Never a corrupt error.
+    for r in results:
+        assert isinstance(r, list), f"Got non-list (corrupt read?): {r!r}"
+        assert r == ["foo", "bar"] or len(r) == 50, f"Unexpected snapshot: {r!r}"
+
+
+def test_save_serializes_concurrent_mutations(tmp_project):
+    """Two threads each: load → mutate → save. The final file must be valid
+    JSON (no interleaved-write corruption — flock prevents this).
+
+    NOTE: This test specifically verifies JSON-corruption-free invariant.
+    Lost-update prevention requires a single LOCK_EX spanning load-modify-
+    save (e.g., a future State.locked() API), which is out of scope here.
+    """
+    s = State.load()
+    s.data["skills_invoked"] = []
+    s.save()
+
+    barrier = threading.Barrier(2)
+    def worker(skill_name):
+        barrier.wait()  # both threads start at the same time
+        loaded = State.load()
+        loaded.record_skill(skill_name)
+        loaded.save()
+
+    t1 = threading.Thread(target=worker, args=("alpha",))
+    t2 = threading.Thread(target=worker, args=("beta",))
+    t1.start(); t2.start()
+    t1.join(); t2.join()
+
+    # Critical assertion: the file on disk must be valid JSON. Without flock,
+    # interleaved writes could corrupt the file mid-write. With LOCK_EX, the
+    # two saves serialize cleanly.
+    sp = tmp_project / ".claude" / "dev-state.json"
+    parsed = json.loads(sp.read_text())  # raises if corrupted
+    assert isinstance(parsed["skills_invoked"], list)

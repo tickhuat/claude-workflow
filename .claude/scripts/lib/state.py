@@ -6,10 +6,54 @@ import json
 import os
 import re
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    import fcntl as _fcntl
+    _HAS_FCNTL = True
+except ImportError:
+    _fcntl = None
+    _HAS_FCNTL = False
+
+
+@contextmanager
+def _flocked(path: Path, exclusive: bool):
+    """Open path and hold an advisory flock for the context duration.
+
+    Falls back to no-lock on systems without fcntl (Windows). On POSIX,
+    LOCK_EX blocks all readers/writers until released; LOCK_SH allows
+    multiple readers.
+
+    No timeout: hooks are short-lived (<100ms typical); a stuck hook
+    indicates a bug to investigate, not silently mask.
+    """
+    # Read modes need the file to exist; for save we open r+ if exists else w+
+    if exclusive:
+        if path.exists():
+            mode = "r+"
+        else:
+            mode = "w+"
+    else:
+        if not path.exists():
+            # Read of a non-existent file: yield None to signal absence
+            yield None
+            return
+        mode = "r"
+
+    with path.open(mode) as f:
+        if _HAS_FCNTL:
+            lock_type = _fcntl.LOCK_EX if exclusive else _fcntl.LOCK_SH
+            _fcntl.flock(f.fileno(), lock_type)
+            try:
+                yield f
+            finally:
+                _fcntl.flock(f.fileno(), _fcntl.LOCK_UN)
+        else:
+            yield f
 
 
 class StateError(RuntimeError):
@@ -55,13 +99,16 @@ class State:
     @classmethod
     def load(cls) -> "State":
         p = state_path()
-        if not p.exists():
-            return cls()
-        try:
-            data = json.loads(p.read_text())
-        except json.JSONDecodeError as e:
-            raise StateError(f"corrupt state at {p}: {e}") from e
-        # Legacy detection: state files predating schema_version (introduced in spec-2)
+        with _flocked(p, exclusive=False) as f:
+            if f is None:
+                return cls()  # file doesn't exist
+            try:
+                data = json.loads(f.read())
+            except json.JSONDecodeError as e:
+                raise StateError(f"corrupt state at {p}: {e}") from e
+        # Legacy detection: state files predating schema_version (introduced in spec-2).
+        # Persist the upgrade under LOCK_EX (with re-read to avoid double-write
+        # when two loads race on the same legacy file).
         if "schema_version" not in data:
             print(
                 "[INFO by dev-rules] state schema_version added (was legacy v1)",
@@ -74,7 +121,21 @@ class State:
             # re-print the INFO since the file remained unchanged. The WARN below
             # surfaces this anomaly without fail-closing the load.
             try:
-                p.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+                with _flocked(p, exclusive=True) as f:
+                    # Re-read under exclusive lock — another concurrent loader
+                    # may have already written this upgrade.
+                    f.seek(0)
+                    current = f.read()
+                    try:
+                        latest = json.loads(current) if current else {}
+                    except json.JSONDecodeError:
+                        latest = {}
+                    if "schema_version" not in latest:
+                        # Still missing; we win the race
+                        f.seek(0)
+                        f.truncate()
+                        f.write(json.dumps(data, indent=2, ensure_ascii=False))
+                    # else: another process already upgraded; nothing to do
             except OSError as e:
                 print(
                     f"[WARN by dev-rules] could not persist schema_version to {p}: {e}",
@@ -89,7 +150,11 @@ class State:
     def save(self) -> None:
         p = state_path()
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(self.data, indent=2, ensure_ascii=False))
+        payload = json.dumps(self.data, indent=2, ensure_ascii=False)
+        with _flocked(p, exclusive=True) as f:
+            f.seek(0)
+            f.truncate()
+            f.write(payload)
 
     def record_skill(self, skill: str) -> None:
         if skill not in self.data["skills_invoked"]:
