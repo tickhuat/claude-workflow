@@ -23,6 +23,14 @@ def log_bypass(*, hook: str, tool: str, tool_input: dict[str, Any], stage: str) 
     # any prior .old) and start fresh. We keep only 1 backup — bypass.log
     # is an audit trail, not a production log; users wanting longer history
     # should set up logrotate themselves.
+    #
+    # Race note: under concurrent bypass writes, two processes can both
+    # observe size >= threshold and race the rename. Worst case is one
+    # extra rotation cycle (the second rename overwrites .old immediately,
+    # losing the prior log buffer that had just been promoted). Acceptable
+    # for an audit log; flocking the rename adds complexity without
+    # protecting any consistency invariant we care about. ADR 0019's flock
+    # covers dev-state.json only; bypass.log is intentionally lock-free.
     if p.exists() and p.stat().st_size >= ROTATE_BYTES:
         old = p.with_suffix(".log.old")
         if old.exists():

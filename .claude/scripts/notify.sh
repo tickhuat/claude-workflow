@@ -61,9 +61,13 @@ platform="$(uname -s)"
 tool="none"
 rc="-"
 err=""
+err_file=""
 
 if [ "$fire" = "yes" ]; then
   err_file="$(mktemp)"
+  # Trap ensures temp file cleanup even if the script is interrupted by a
+  # signal between mktemp and the rm at the end of this block.
+  trap '[ -n "$err_file" ] && rm -f "$err_file"' EXIT
   case "$platform" in
     Darwin)
       tool="osascript"
