@@ -73,11 +73,14 @@ def main() -> int:
                         touched = touched_dict.setdefault(str(s.data["current_phase"]), [])
                         if rel_str not in touched and matches_any(rel_str, targets):
                             touched.append(rel_str)
-                        # All target globs covered?
-                        all_covered = bool(targets) and all(
-                            any(matches_any(t, [g]) for t in touched) for g in targets
+                        # ADR 0014 / Issue #3: OR semantics — phase advances as soon
+                        # as ANY touched file matches ANY target glob. Glob targets
+                        # are "possibility sets", not checklists; TDD ordering is
+                        # enforced separately by pre_edit (Issue #1).
+                        any_touched = bool(targets) and any(
+                            matches_any(t, targets) for t in touched
                         )
-                        if all_covered and not s.data["stage"].startswith("phase-"):
+                        if any_touched and not s.data["stage"].startswith("phase-"):
                             s.set_stage(f"phase-{s.data['current_phase']}-done")
                         s.save()
                 except FrontmatterError:

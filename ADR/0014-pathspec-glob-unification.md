@@ -42,9 +42,10 @@ Code review (round 2) 揭露兩條 glob 邏輯並存：
    內部換成：
    ```python
    import pathspec
-   spec = pathspec.PathSpec.from_lines("gitwildmatch", [pattern])
+   spec = pathspec.PathSpec.from_lines("gitignore", [pattern])
    return spec.match_file(path)
    ```
+   （pathspec ≥1.x 推薦的 identifier 是 `"gitignore"`；`"gitwildmatch"` 從 1.0 起 deprecated 但語意相同。本 ADR 用 `"gitignore"` 避免 deprecation warning。）
 3. **刪掉 `pre_edit._matches_any`**：所有呼叫端改用 `lib.glob_match.matches_any`
 4. **`pre_edit._targets_include_tests` 重寫**：不再用 sentinel path 探測，直接用字串 inspect
    ```python

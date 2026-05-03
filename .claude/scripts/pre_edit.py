@@ -10,7 +10,6 @@ Rules in evaluation order:
 """
 from __future__ import annotations
 
-import fnmatch
 import json
 import sys
 from pathlib import Path
@@ -26,38 +25,6 @@ from lib.skills import EVENT_FLAG_TO_SKILL  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
 
 
-def _matches_any(rel: str, globs: list[str]) -> bool:
-    """Match rel path against any of the globs.
-
-    Supports:
-    - Extension globs: "*.md" matches "README.md" and "src/foo.md" (any .md anywhere)
-    - Prefix globs: "docs/**" matches "docs/x", "docs/a/b.txt", etc.
-    - Exact filenames: ".gitignore" matches ".gitignore" or "subdir/.gitignore"
-    - fnmatch patterns: "src/*.py" works on top-level src
-    """
-    rel_norm = rel.replace("\\", "/")
-    name = Path(rel_norm).name
-    for g in globs:
-        # 1. extension/leaf glob (no slash) — match against basename
-        if "/" not in g and "**" not in g:
-            if fnmatch.fnmatch(name, g):
-                return True
-            continue
-        # 2. prefix glob "X/**"
-        if g.endswith("/**"):
-            prefix = g[:-3]
-            if rel_norm == prefix or rel_norm.startswith(prefix + "/"):
-                return True
-            continue
-        # 3. literal path
-        if rel_norm == g:
-            return True
-        # 4. fnmatch fallback
-        if fnmatch.fnmatch(rel_norm, g):
-            return True
-    return False
-
-
 def _phase_touched_tests(state: State, phase: int) -> bool:
     touched = state.data.get("phase_files_touched", {}).get(str(phase), [])
     return any(p.startswith("tests/") or "/tests/" in p for p in touched)
@@ -68,8 +35,15 @@ def _is_test_file(rel: str) -> bool:
 
 
 def _targets_include_tests(targets: list[str]) -> bool:
-    """Return True if target_files contains any tests/** pattern."""
-    return any(_matches_any("tests/placeholder.py", [t]) or t.startswith("tests/") for t in targets)
+    """Return True if any target glob mentions 'test' (heuristic).
+
+    Used by the TDD gate to decide whether to enforce test-first ordering.
+    Recognises 'tests/**', '**/tests/**', '**/test_*.py', 'tests/foo.py', etc.
+    Conservative: false negatives mean TDD enforcement skipped, not bypassed
+    (hooks always allow writes; this only controls whether to BLOCK src writes
+    that come before any test write).
+    """
+    return any("test" in g.lower() for g in targets)
 
 
 def main() -> int:
@@ -136,7 +110,7 @@ def main() -> int:
         # (.claude/** is in whitelist so will pass)
 
     # 3. Global whitelist passes
-    if _matches_any(rel, global_whitelist):
+    if matches_any(rel, global_whitelist):
         return 0
 
     # 4. Stage gating (Phase 2 logic)
@@ -180,7 +154,7 @@ def main() -> int:
                     pass
 
         # 5a. target_files match → pass (with TDD check)
-        if _matches_any(rel, targets):
+        if matches_any(rel, targets):
             # TDD: src/** writes require prior tests/** writes in this phase
             # Only enforce TDD when the plan also includes tests/** in target_files
             if rel.startswith("src/") and not _is_test_file(rel) and _targets_include_tests(targets):

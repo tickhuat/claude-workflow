@@ -1,4 +1,5 @@
-from lib.glob_match import matches_any
+"""Glob matching uses .gitignore wildmatch semantics via pathspec (ADR 0014)."""
+from lib.glob_match import matches, matches_any
 
 
 def test_double_star_matches_nested():
@@ -14,19 +15,40 @@ def test_exact_path():
 
 def test_single_star_in_segment():
     assert matches_any("tests/test_a.py", ["tests/test_*.py"]) is True
+    # gitignore semantics: tests/test_*.py only matches direct children of tests/
     assert matches_any("tests/a/test_a.py", ["tests/test_*.py"]) is False
-
-
-def test_brace_glob_not_supported_falls_back():
-    # 只支援 fnmatch 子集；brace 不支援
-    assert matches_any("src/a.py", ["src/{a,b}.py"]) is False
 
 
 def test_multiple_patterns_any_match():
     assert matches_any("docs/x.md", ["src/**", "docs/**"]) is True
 
 
-def test_extension_glob():
+def test_extension_glob_crosses_directories():
+    """ADR 0014: bare '*.md' matches any .md anywhere (gitignore semantics)."""
     assert matches_any("foo.md", ["*.md"]) is True
-    assert matches_any("docs/foo.md", ["*.md"]) is False  # *.md 不跨目錄；要 **/*.md
+    assert matches_any("docs/foo.md", ["*.md"]) is True
+    assert matches_any("docs/sub/foo.md", ["*.md"]) is True
+    assert matches_any("foo.txt", ["*.md"]) is False
+
+
+def test_double_star_slash_extension():
     assert matches_any("docs/foo.md", ["**/*.md"]) is True
+    assert matches_any("foo.md", ["**/*.md"]) is True
+
+
+def test_dotfile_at_root():
+    assert matches_any(".gitignore", [".gitignore"]) is True
+
+
+def test_negation_pattern_supported():
+    """gitignore supports '!' negation; pathspec passes it through."""
+    # Files allowed: anything matching src/** but NOT src/internal/**
+    patterns = ["src/**", "!src/internal/**"]
+    assert matches_any("src/app.py", patterns) is True
+    assert matches_any("src/internal/private.py", patterns) is False
+
+
+def test_matches_single_pattern_helper():
+    """matches() takes one pattern; equivalent to matches_any with single-element list."""
+    assert matches("src/a.py", "src/**") is True
+    assert matches("docs/a.md", "src/**") is False

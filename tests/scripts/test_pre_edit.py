@@ -228,3 +228,31 @@ def test_pre_edit_respects_custom_sensitive_globs(tmp_project, set_stage):
     r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(payment)}}, tmp_project)
     assert r.returncode == 2
     assert "敏感" in r.stderr or "ADR" in r.stderr
+
+
+def test_targets_include_tests_recognizes_various_patterns():
+    """_targets_include_tests should accept any pattern that mentions 'test'."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
+    from pre_edit import _targets_include_tests
+
+    assert _targets_include_tests(["tests/**"]) is True
+    assert _targets_include_tests(["**/tests/**"]) is True
+    assert _targets_include_tests(["**/test_*.py"]) is True
+    assert _targets_include_tests(["tests/foo.py"]) is True
+    assert _targets_include_tests(["src/a.py"]) is False
+    assert _targets_include_tests([]) is False
+
+
+def test_pre_edit_uses_lib_glob_match_not_local_helper():
+    """Regression: pre_edit must import matches_any from lib.glob_match,
+    not redefine its own _matches_any."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
+    import pre_edit
+    # _matches_any was deleted in this refactor
+    assert not hasattr(pre_edit, "_matches_any"), (
+        "pre_edit._matches_any should be removed; use lib.glob_match.matches_any"
+    )
