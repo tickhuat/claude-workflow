@@ -25,3 +25,10 @@ This repo enforces a structured development flow via Claude Code hooks. Spec: `d
 **Emergency:** `DEV_RULES_BYPASS=1` env var bypasses any hook block but logs to `.claude/bypass.log`.
 
 **Dev state:** `.claude/dev-state.json` (gitignored). Inspect: `cat .claude/dev-state.json | python3 -m json.tool`.
+
+## LLM behavior
+
+The hook system enforces structure (which files, which order). These rules cover behavior the hooks can't catch:
+
+- **Surface ambiguity, don't silently pick.** If the request has multiple plausible interpretations, present them as α/β/γ options before implementing. Push back with technical reasoning when a request seems wrong — don't agree performatively.
+- **Stay surgical inside target_files.** The hooks gate which files you may touch; they do NOT gate what you do once inside. Don't reformat unrelated code, "improve" adjacent comments, or refactor working code that the task didn't ask about. Every changed line should trace to the current task or plan step.
