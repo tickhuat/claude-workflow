@@ -276,3 +276,38 @@ def test_pre_edit_uses_lib_glob_match_not_local_helper():
     assert not hasattr(pre_edit, "_matches_any"), (
         "pre_edit._matches_any should be removed; use lib.glob_match.matches_any"
     )
+
+
+def test_pre_edit_sensitive_path_blocked_even_when_extension_whitelisted(tmp_project, set_stage):
+    """Critical regression (post-Round 1 cascade audit): under ADR 0014's gitignore
+    semantics, *.json/*.yaml/*.toml in global_whitelist match recursively.
+    A sensitive file like src/migrations/001.json must still be blocked, NOT
+    let through by *.json whitelist. Sensitive check must run BEFORE whitelist.
+    """
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text(
+        "global_whitelist:\n  - '*.json'\n  - 'docs/**'\n"
+        "sensitive_globs:\n  - '**/migrations/**'\n  - '**/auth*'\n"
+    )
+    set_stage(stage="exec-running", current_phase=1)
+    sensitive = tmp_project / "src" / "migrations" / "001.json"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(sensitive)}}, tmp_project)
+    assert r.returncode == 2, f"sensitive file slipped past whitelist: stderr={r.stderr!r}"
+    assert "敏感" in r.stderr or "ADR" in r.stderr
+
+
+def test_pre_edit_sensitive_path_passes_when_in_target_files(tmp_project, set_stage):
+    """Sensitive paths CAN be edited if explicitly listed in current phase's
+    target_files (the user approved them via plan)."""
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text(
+        "global_whitelist:\n  - '*.json'\n"
+        "sensitive_globs:\n  - '**/auth*'\n"
+    )
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("---\nphases:\n  - id: 1\n    target_files:\n      - src/auth_handler.py\n---\nbody")
+    set_stage(stage="exec-running", current_plan="docs/superpowers/plans/p.md", current_phase=1)
+    auth = tmp_project / "src" / "auth_handler.py"
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(auth)}}, tmp_project)
+    assert r.returncode == 0, f"sensitive file in target_files wrongly blocked: stderr={r.stderr!r}"

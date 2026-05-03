@@ -50,7 +50,15 @@ def main() -> int:
     except StateError as e:
         print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
         return 0
-    if s.data["stage"] in ("exec-prep", "exec-running") and s.data.get("current_phase"):
+    # Include phase-N-done so subsequent edits in the same phase keep being
+    # tracked. ADR 0014 OR-semantics flips stage to phase-N-done on first match,
+    # but more files may be touched after that — they all belong to this phase.
+    stage = s.data["stage"]
+    is_exec_stage = (
+        stage in ("exec-prep", "exec-running")
+        or (stage.startswith("phase-") and stage.endswith("-done"))
+    )
+    if is_exec_stage and s.data.get("current_phase"):
         from lib.frontmatter import parse, FrontmatterError
         from lib.glob_match import matches_any
 

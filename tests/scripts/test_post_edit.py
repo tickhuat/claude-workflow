@@ -145,3 +145,35 @@ def test_already_in_phase_done_does_not_re_advance(tmp_project):
     state = json.loads(sp.read_text())
     # Stays in phase-1-done; doesn't bounce
     assert state["stage"] == "phase-1-done"
+
+
+def test_phase_files_touched_continues_recording_after_phase_done(tmp_project):
+    """Critical regression (post-Round 1 cascade audit): under ADR 0014's OR-
+    semantics, stage flips to phase-N-done after the FIRST target-matching edit.
+    Post_edit's tracking gate must include phase-N-done so subsequent edits in
+    the same phase are still recorded — otherwise phase_files_touched is
+    silently truncated to one file per phase."""
+    _setup_plan_and_state(tmp_project, ["src/**", "tests/**"], current_phase=1)
+
+    # First edit: triggers phase-1-done
+    test_file = tmp_project / "tests" / "test_a.py"
+    test_file.parent.mkdir(parents=True, exist_ok=True)
+    test_file.write_text("def test_a(): pass")
+    r = run_post_edit(str(test_file), tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["stage"] == "phase-1-done"
+    assert state["phase_files_touched"]["1"] == ["tests/test_a.py"]
+
+    # Subsequent edit in same phase: must still be recorded despite phase-1-done
+    src_a = tmp_project / "src" / "a.py"
+    src_a.parent.mkdir(parents=True, exist_ok=True)
+    src_a.write_text("def a(): return 1")
+    r = run_post_edit(str(src_a), tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["stage"] == "phase-1-done"  # unchanged
+    assert state["phase_files_touched"]["1"] == ["tests/test_a.py", "src/a.py"], (
+        f"phase_files_touched truncated after phase-1-done; got "
+        f"{state['phase_files_touched']['1']}"
+    )
