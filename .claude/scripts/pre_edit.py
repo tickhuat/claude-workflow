@@ -11,6 +11,7 @@ Rules in evaluation order:
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -34,16 +35,18 @@ def _is_test_file(rel: str) -> bool:
     return rel.startswith("tests/") or "/tests/" in rel
 
 
+_TEST_SEGMENT_RE = re.compile(r"(^|/|_)test(s)?(/|_|\.|$)")
+
+
 def _targets_include_tests(targets: list[str]) -> bool:
-    """Return True if any target glob mentions 'test' (heuristic).
+    """Return True if any target glob has 'test' or 'tests' as a path segment.
 
     Used by the TDD gate to decide whether to enforce test-first ordering.
-    Recognises 'tests/**', '**/tests/**', '**/test_*.py', 'tests/foo.py', etc.
-    Conservative: false negatives mean TDD enforcement skipped, not bypassed
-    (hooks always allow writes; this only controls whether to BLOCK src writes
-    that come before any test write).
+    Recognises 'tests/**', '**/tests/**', '**/test_*.py', 'tests/foo.py',
+    'foo_test.go', etc. Rejects substring matches like 'latest/**',
+    'protests/**', 'contests/foo.py' to avoid spurious TDD enforcement.
     """
-    return any("test" in g.lower() for g in targets)
+    return any(_TEST_SEGMENT_RE.search(g.lower()) for g in targets)
 
 
 def main() -> int:

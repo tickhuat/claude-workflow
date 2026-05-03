@@ -77,9 +77,9 @@ def main() -> int:
                         # as ANY touched file matches ANY target glob. Glob targets
                         # are "possibility sets", not checklists; TDD ordering is
                         # enforced separately by pre_edit (Issue #1).
-                        any_touched = bool(targets) and any(
-                            matches_any(t, targets) for t in touched
-                        )
+                        # touched is pre-filtered on append (line 74) so non-empty
+                        # touched implies at least one match — no need to re-check.
+                        any_touched = bool(targets) and bool(touched)
                         if any_touched and not s.data["stage"].startswith("phase-"):
                             s.set_stage(f"phase-{s.data['current_phase']}-done")
                         s.save()

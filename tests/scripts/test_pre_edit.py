@@ -231,18 +231,38 @@ def test_pre_edit_respects_custom_sensitive_globs(tmp_project, set_stage):
 
 
 def test_targets_include_tests_recognizes_various_patterns():
-    """_targets_include_tests should accept any pattern that mentions 'test'."""
+    """_targets_include_tests should accept any pattern that mentions 'test'
+    as a path segment."""
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
     from pre_edit import _targets_include_tests
 
+    # True positives — segment-aligned 'test' or 'tests'
     assert _targets_include_tests(["tests/**"]) is True
     assert _targets_include_tests(["**/tests/**"]) is True
     assert _targets_include_tests(["**/test_*.py"]) is True
     assert _targets_include_tests(["tests/foo.py"]) is True
+    assert _targets_include_tests(["test_foo.py"]) is True
+    assert _targets_include_tests(["foo_test.go"]) is True  # Go convention
+    assert _targets_include_tests(["foo/tests"]) is True
+    # True negatives
     assert _targets_include_tests(["src/a.py"]) is False
     assert _targets_include_tests([]) is False
+
+
+def test_targets_include_tests_rejects_substring_false_positives():
+    """Regression for review feedback: 'test' as substring (not segment) must
+    NOT trigger TDD enforcement (latest, protests, contests, attest, etc.)."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
+    from pre_edit import _targets_include_tests
+
+    assert _targets_include_tests(["latest/**"]) is False
+    assert _targets_include_tests(["protests/**"]) is False
+    assert _targets_include_tests(["contests/foo.py"]) is False
+    assert _targets_include_tests(["attest_helper.py"]) is False
 
 
 def test_pre_edit_uses_lib_glob_match_not_local_helper():

@@ -18,26 +18,27 @@ _ADR_RE = re.compile(r"^(\d{4}-[\w-]+)\.md$")
 
 
 def _resolve_adr_root(file_path: Path) -> Path | None:
-    """Return the directory that should contain ADR/<slug>.md, or None.
+    """Return the directory that contains the ADR slug under file_path, or None.
 
-    Checks (in order):
-    1. project_root() — normal case, file under main repo
-    2. main repo root via `git rev-parse --git-common-dir` — file under a worktree
+    Tries cheap project_root() first, only spawning `git rev-parse --git-common-dir`
+    (~6ms) if file is outside project_root — i.e. when running inside a worktree
+    while the ADR file lives in the main repo.
     """
-    candidates: list[Path] = [project_root()]
-    common = git_common_dir(project_root())
-    if common is not None:
-        # .git → repo root is its parent
-        main_root = common.parent
-        if main_root not in candidates:
-            candidates.append(main_root)
-    for root in candidates:
-        try:
-            file_path.relative_to(root)
-            return root
-        except ValueError:
-            continue
-    return None
+    root = project_root()
+    try:
+        file_path.relative_to(root)
+        return root
+    except ValueError:
+        pass
+    common = git_common_dir(root)
+    if common is None:
+        return None
+    main_root = common.parent
+    try:
+        file_path.relative_to(main_root)
+        return main_root
+    except ValueError:
+        return None
 
 
 def main() -> int:
@@ -55,6 +56,13 @@ def main() -> int:
         return 0
     fp = Path(file_path).resolve()
 
+    # Cheap basename check first — bail before any path resolution if filename
+    # isn't even ADR-shaped. This avoids running git_common_dir's subprocess on
+    # the 99% of Reads that aren't ADR files.
+    m = _ADR_RE.match(fp.name)
+    if not m:
+        return 0
+
     root = _resolve_adr_root(fp)
     if root is None:
         return 0
@@ -63,11 +71,8 @@ def main() -> int:
     except ValueError:
         return 0
 
-    # Must be ADR/<NNNN>-<slug>.md
+    # Must be exactly ADR/<NNNN>-<slug>.md (not nested deeper)
     if len(rel.parts) != 2 or rel.parts[0] != "ADR":
-        return 0
-    m = _ADR_RE.match(rel.parts[1])
-    if not m:
         return 0
     slug = m.group(1)
     # Skip template
