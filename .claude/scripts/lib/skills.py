@@ -15,7 +15,8 @@ SKILL_TO_STAGE: dict[str, dict[str, str]] = {
     "writing-plans": {"spec-ready": "plan-ready"},
     "executing-plans": {"plan-ready": "exec-running", "exec-prep": "exec-running"},
     "subagent-driven-development": {"plan-ready": "exec-running", "exec-prep": "exec-running"},
-    "using-git-worktrees": {"plan-ready": "exec-prep"},
+    # using-git-worktrees deliberately omitted (ADR 0020): it's a tool action,
+    # not a state transition. record_skill() still tracks invocation.
     "requesting-code-review": {"all-phases-verified": "reviewed"},
     "finishing-a-development-branch": {"reviewed": "done"},
     "using-superpowers": {"idle": "session-started"},

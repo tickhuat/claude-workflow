@@ -55,7 +55,6 @@ stateDiagram-v2
     idle --> session_started: using-superpowers
     session_started --> spec_ready: brainstorming + spec w/ adrs
     spec_ready --> plan_ready: writing-plans + plan w/ phases
-    plan_ready --> exec_prep: using-git-worktrees
     plan_ready --> exec_running: executing-plans
     exec_prep --> exec_running: executing-plans
     exec_running --> phase_N_done: target_files all touched
@@ -68,6 +67,8 @@ stateDiagram-v2
 ```
 
 Stage names use hyphens (e.g. `session-started`); the diagram uses underscores because Mermaid identifiers can't contain hyphens.
+
+**Tool-style skills**: `using-git-worktrees` is a tool, not a state transition. It can be invoked at any stage (idle, plan-ready, exec-running, done, etc.) without advancing the dev-rules state machine. Use it whenever you need an isolated workspace. (See ADR 0020.)
 
 ### Hooks
 
