@@ -91,15 +91,29 @@ def main() -> int:
         )
         return 0
 
-    # 1. event_flags require corresponding skills
+    # 1. event_flags WARN-once (ADR 0017 — was BLOCK in Round 1).
+    # If flag is true and corresponding skill not invoked yet, print a
+    # warning to stderr and clear the flag (warn-once semantics). Does not
+    # block the edit. Skills may be invoked later by the user if relevant.
+    #
+    # Race trade-off: this load → warn → clear → save sequence is NOT
+    # atomic with concurrent on_user_prompt prompt-detection writes. Worst
+    # case: one missed warning if a fresh prompt's flag-set races with our
+    # save. Acceptable per ADR 0017 — the warning is advisory, not gating.
+    flags_to_clear = []
     for flag, required_skill in EVENT_FLAG_TO_SKILL.items():
         if s.data["event_flags"].get(flag) and not s.has_skill(required_skill):
-            print(format_block(
-                problem=f"event flag {flag} 為 true，必須先呼叫 {required_skill}。",
-                stage=stage,
-                actions=[f"呼叫 Skill(skill=\"{required_skill}\")"],
-            ), file=sys.stderr)
-            return 2
+            print(
+                f"[WARN by dev-rules] event flag '{flag}' was set by your prompt. "
+                f"Recommended: Skill(skill=\"{required_skill}\") before continuing "
+                f"if this is the actual intent. (Warn-once: flag is now cleared.)",
+                file=sys.stderr,
+            )
+            flags_to_clear.append(flag)
+    if flags_to_clear:
+        for f in flags_to_clear:
+            s.data["event_flags"][f] = False
+        s.save()
 
     # 2. .claude/skills/ requires writing-skills
     if rel.startswith(".claude/skills/") or "/.claude/skills/" in rel:

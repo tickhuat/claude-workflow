@@ -55,18 +55,28 @@ def main() -> int:
     except json.JSONDecodeError:
         pass
 
-    # Set event_flags from keywords
+    # ADR 0017: event_flags are PER-PROMPT scoped. Reset all flags on every
+    # prompt before re-detecting. Previous prompts' flags must not persist.
     flags = _detect_flags(prompt)
-    if flags:
-        try:
-            s = State.load()
-        except StateError as e:
-            print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
-            _print_adr_index()
-            return 0
-        for k, v in flags.items():
-            s.data["event_flags"][k] = v
-        s.save()
+    try:
+        s = State.load()
+    except StateError as e:
+        print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
+        _print_adr_index()
+        return 0
+    # Optimization: skip the save() if no detection AND no flags are set.
+    # Most prompts don't contain keywords; this is the hot path.
+    current = s.data["event_flags"]
+    if not flags and not any(current.values()):
+        _print_adr_index()
+        return 0
+    # Reset all known flags to false
+    for known_flag in current:
+        current[known_flag] = False
+    # Then set newly-detected flags to true
+    for k, v in flags.items():
+        current[k] = v
+    s.save()
 
     # Inject ADR index
     _print_adr_index()
