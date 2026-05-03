@@ -7,6 +7,12 @@ import pytest
 from lib.state import State, StateError, INITIAL_STATE
 
 
+def _scripts_dir():
+    """Return absolute path to .claude/scripts (for subprocess sys.path injection)."""
+    from pathlib import Path
+    return Path(__file__).resolve().parents[2] / ".claude" / "scripts"
+
+
 def test_load_creates_initial_when_missing(tmp_project):
     s = State.load()
     assert s.data["stage"] == "idle"
@@ -393,3 +399,114 @@ def test_save_serializes_concurrent_mutations(tmp_project):
     sp = tmp_project / ".claude" / "dev-state.json"
     parsed = json.loads(sp.read_text())  # raises if corrupted
     assert isinstance(parsed["skills_invoked"], list)
+
+
+def test_migrate_v1_to_v2_raises_on_v2_input():
+    """v3-future guard: calling the v1-only migrator with v2 input must
+    raise loudly rather than silently downgrading the schema_version."""
+    from lib.state import _migrate_v1_to_v2
+    with pytest.raises(ValueError, match=r"schema_version=2"):
+        _migrate_v1_to_v2({"schema_version": 2, "skills_invoked": []})
+
+
+def test_migrate_v1_to_v2_raises_on_missing_schema_version():
+    """Defensive: dict without schema_version is also not v1."""
+    from lib.state import _migrate_v1_to_v2
+    with pytest.raises(ValueError, match=r"schema_version=None"):
+        _migrate_v1_to_v2({"skills_invoked": []})
+
+
+def test_migrate_v1_to_v2_succeeds_on_v1_input():
+    """Sanity: explicit v1 input still works (regression guard for the new check).
+
+    Uses 'superpowers:brainstorming' (single ':') to match real-world v1 state
+    files written before ADR 0012, plus the migrator's split(':', 1) semantics
+    documented in the function body comment.
+    """
+    from lib.state import _migrate_v1_to_v2
+    result = _migrate_v1_to_v2({
+        "schema_version": 1,
+        "skills_invoked": ["superpowers:brainstorming", "brainstorming"],
+    })
+    assert result["schema_version"] == 2
+    assert result["skills_invoked"] == ["brainstorming"]
+
+
+def test_concurrent_v2_migration_only_one_info(tmp_project):
+    """Two subprocess loaders on a v1 file: only one prints the migration
+    INFO; final file is v2; both loaders see consistent v2 state.
+
+    Uses subprocess (not threading) because fcntl.flock is process-level —
+    threads in the same process don't block each other on the lock.
+    """
+    import subprocess
+    import sys
+    import json
+    import textwrap
+    from concurrent.futures import ThreadPoolExecutor
+
+    # Pre-fill v1 state file (with namespaced skill so v2 dedupe has work to do)
+    p = tmp_project / ".claude" / "dev-state.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({
+        "schema_version": 1,
+        "stage": "idle",
+        "current_spec": None,
+        "current_plan": None,
+        "current_phase": 0,
+        "phases_total": 0,
+        "phases_verified": [],
+        "skills_invoked": ["superpowers:brainstorming"],
+        "adrs_read": [],
+        "deviation_log": [],
+        "event_flags": {
+            "debug_required": False,
+            "parallel_required": False,
+            "review_required": False,
+        },
+    }))
+
+    # Loader script: load State, print resulting schema_version on stdout,
+    # let stderr through so caller can capture INFO.
+    loader_script = textwrap.dedent(f"""
+        import sys
+        sys.path.insert(0, {str(_scripts_dir()) !r})
+        from lib.state import State
+        s = State.load()
+        print(s.data["schema_version"])
+    """)
+
+    def run_loader():
+        return subprocess.run(
+            [sys.executable, "-c", loader_script],
+            cwd=str(tmp_project),
+            env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": "/usr/bin:/bin"},
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    # ThreadPoolExecutor only orchestrates the subprocess.run() calls; the
+    # actual race is between two real OS processes contending on flock.
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f1 = ex.submit(run_loader)
+        f2 = ex.submit(run_loader)
+        r1, r2 = f1.result(), f2.result()
+
+    # Both subprocesses should exit cleanly with schema_version=2 on stdout
+    assert r1.returncode == 0, f"loader 1 failed: {r1.stderr}"
+    assert r2.returncode == 0, f"loader 2 failed: {r2.stderr}"
+    assert r1.stdout.strip() == "2"
+    assert r2.stdout.strip() == "2"
+
+    # Final disk file is v2
+    final = json.loads(p.read_text())
+    assert final["schema_version"] == 2
+
+    # Combined stderr should contain exactly ONE migration INFO
+    combined_err = r1.stderr + r2.stderr
+    info_count = combined_err.count("state migrated v1 → v2")
+    assert info_count == 1, (
+        f"expected exactly 1 v2 migration INFO across both loaders; "
+        f"got {info_count}.\nstderr 1: {r1.stderr!r}\nstderr 2: {r2.stderr!r}"
+    )

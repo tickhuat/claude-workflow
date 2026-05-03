@@ -181,3 +181,75 @@ def test_merge_upstream_main_passes_as_sync_operation(tmp_project):
     set_state(tmp_project, stage="exec-running")
     r = run_pre_bash("git merge upstream/main", tmp_project)
     assert r.returncode == 0
+
+
+def test_commit_heredoc_with_deviation_requires_note(tmp_project):
+    """Heredoc-form commit message with deviation but no keyword → blocked."""
+    set_state(tmp_project, stage="exec-running", current_phase=1,
+              deviation_log=[{"phase": 1, "file": "src/x.py"}])
+    cmd = """git commit -m "$(cat <<'EOF'
+feat: stuff
+
+Body without the magic keyword.
+EOF
+)\""""
+    r = run_pre_bash(cmd, tmp_project)
+    assert r.returncode == 2, f"expected block; stderr={r.stderr!r}"
+    assert "Deviation:" in r.stderr
+
+
+def test_commit_heredoc_with_deviation_note_passes(tmp_project):
+    """Heredoc-form commit with deviation and keyword in body → passes."""
+    set_state(tmp_project, stage="exec-running", current_phase=1,
+              deviation_log=[{"phase": 1, "file": "src/x.py"}])
+    cmd = """git commit -m "$(cat <<'EOF'
+feat: stuff
+
+Deviation: small new dep
+EOF
+)\""""
+    r = run_pre_bash(cmd, tmp_project)
+    assert r.returncode == 0, f"expected pass; stderr={r.stderr!r}"
+
+
+def test_commit_heredoc_no_deviation_passes(tmp_project):
+    """Heredoc-form commit with no active deviations → passes regardless of body."""
+    set_state(tmp_project, stage="exec-running", current_phase=1, deviation_log=[])
+    cmd = """git commit -m "$(cat <<'EOF'
+feat: stuff
+no deviation in body either
+EOF
+)\""""
+    r = run_pre_bash(cmd, tmp_project)
+    assert r.returncode == 0
+
+
+def test_commit_heredoc_unquoted_tag_with_deviation_requires_note(tmp_project):
+    """Heredoc tag without quotes (still valid bash) → still parsed."""
+    set_state(tmp_project, stage="exec-running", current_phase=1,
+              deviation_log=[{"phase": 1, "file": "src/x.py"}])
+    cmd = """git commit -m "$(cat <<EOF
+feat: stuff
+EOF
+)\""""
+    r = run_pre_bash(cmd, tmp_project)
+    assert r.returncode == 2
+
+
+def test_commit_heredoc_body_with_internal_quote_passes(tmp_project):
+    """Regression (cascade audit, Spec 2b): heredoc body containing internal "
+    must not cause _COMMIT_RE to truncate the captured message before the
+    Deviation: keyword. Heredoc regex must be tried FIRST."""
+    set_state(tmp_project, stage="exec-running", current_phase=1,
+              deviation_log=[{"phase": 1, "file": "src/x.py"}])
+    cmd = '''git commit -m "$(cat <<'EOF'
+feat: "quoted" stuff
+
+Deviation: small new dep
+EOF
+)"'''
+    r = run_pre_bash(cmd, tmp_project)
+    assert r.returncode == 0, (
+        f"heredoc body with internal quote + Deviation: keyword "
+        f"should PASS but was blocked. stderr={r.stderr!r}"
+    )

@@ -128,7 +128,17 @@ def _migrate_v1_to_v2(data: dict) -> dict:
     Round 1 introduced ADR 0012 to strip prefixes at hook entry, but state
     files written before that retain entries like 'superpowers:brainstorming'.
     This migrator cleans them up on first load.
+
+    Guard: explicit schema_version check prevents accidental misuse from
+    future migrators (e.g. _migrate_v2_to_v3) that might otherwise call this
+    on a v2 dict and silently overwrite schema_version back to 2.
     """
+    if data.get("schema_version") != 1:
+        raise ValueError(
+            f"_migrate_v1_to_v2 called with schema_version="
+            f"{data.get('schema_version')!r}; expected 1. This function is "
+            "v1-only; future versions need their own migrator."
+        )
     skills = data.get("skills_invoked") or []
     seen = set()
     cleaned = []
@@ -163,10 +173,6 @@ class State:
         # Persist the upgrade under LOCK_EX (with re-read to avoid double-write
         # when two loads race on the same legacy file).
         if "schema_version" not in data:
-            print(
-                "[INFO by dev-rules] state schema_version added (was legacy v1)",
-                file=sys.stderr,
-            )
             data["schema_version"] = 1
             # Persist immediately so subsequent loads don't re-trigger the INFO.
             # Trade-off: if write fails (read-only fs, perms), in-memory state is
@@ -184,11 +190,18 @@ class State:
                     except json.JSONDecodeError:
                         latest = {}
                     if "schema_version" not in latest:
-                        # Still missing; we win the race
+                        # Still missing; we win the race — print INFO + write.
                         f.seek(0)
                         f.truncate()
                         f.write(json.dumps(data, indent=2, ensure_ascii=False))
-                    # else: another process already upgraded; nothing to do
+                        print(
+                            "[INFO by dev-rules] state schema_version added (was legacy v1)",
+                            file=sys.stderr,
+                        )
+                    else:
+                        # Another process already upgraded; pick up its data and
+                        # stay silent (no INFO since we didn't migrate).
+                        data = latest
             except OSError as e:
                 print(
                     f"[WARN by dev-rules] could not persist schema_version to {p}: {e}",
@@ -198,10 +211,6 @@ class State:
         # This includes both files that started with v1 AND files just promoted
         # from no-version to v1 by the legacy fill above.
         if data.get("schema_version") == 1:
-            print(
-                "[INFO by dev-rules] state migrated v1 → v2 (skills_invoked deduped)",
-                file=sys.stderr,
-            )
             try:
                 with _flocked(p, exclusive=True) as f:
                     # Re-read under exclusive lock — another concurrent process may
@@ -216,13 +225,19 @@ class State:
                         latest = {}
                     if latest.get("schema_version") == 2:
                         # Another process won the race; use the migrated data
+                        # and stay silent (no INFO since we didn't migrate).
                         data = latest
                     else:
-                        # Still v1 (or earlier); migrate latest disk state and write
+                        # Still v1 (or earlier); migrate latest disk state, write,
+                        # then announce the migration.
                         data = _migrate_v1_to_v2(latest if latest else data)
                         f.seek(0)
                         f.truncate()
                         f.write(json.dumps(data, indent=2, ensure_ascii=False))
+                        print(
+                            "[INFO by dev-rules] state migrated v1 → v2 (skills_invoked deduped)",
+                            file=sys.stderr,
+                        )
             except OSError as e:
                 print(
                     f"[WARN by dev-rules] could not persist v2 migration to {p}: {e}",
