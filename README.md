@@ -41,7 +41,7 @@ Optionally edit `.claude/dev-rules.config.yaml` for your project's conventions.
 ### Install dependencies
 
 ```bash
-python3 -m pip install --user "PyYAML>=6.0" pytest
+python3 -m pip install -e ".[dev]"
 python3 -m pytest tests/ -q
 ```
 
