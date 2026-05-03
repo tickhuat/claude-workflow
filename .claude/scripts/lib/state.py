@@ -61,7 +61,7 @@ class StateError(RuntimeError):
 
 
 INITIAL_STATE: dict[str, Any] = {
-    "schema_version": 1,
+    "schema_version": 2,
     "stage": "idle",
     "current_spec": None,
     "current_plan": None,
@@ -90,6 +90,47 @@ def project_root() -> Path:
 
 def state_path() -> Path:
     return project_root() / ".claude" / "dev-state.json"
+
+
+# ---------------------------------------------------------------------------
+# Helpers / Migrations
+# ---------------------------------------------------------------------------
+# Defined ABOVE the State class because State.load() calls _migrate_v1_to_v2
+# during legacy-file upgrade. Keeping helpers in declaration order avoids
+# forward-reference confusion when reading top-to-bottom.
+
+
+def phase_key(n) -> str:
+    """Convert phase id to dict-key form (str). Idempotent for str inputs.
+
+    Use this when reading or writing entries in `phase_files_touched` (a
+    JSON dict, so keys are always strings). Eliminates ad-hoc str(...) casts
+    scattered across hook scripts.
+    """
+    return str(n)
+
+
+def _migrate_v1_to_v2(data: dict) -> dict:
+    """v2: strip namespace prefixes from skills_invoked + dedupe (preserve order).
+
+    Round 1 introduced ADR 0012 to strip prefixes at hook entry, but state
+    files written before that retain entries like 'superpowers:brainstorming'.
+    This migrator cleans them up on first load.
+    """
+    skills = data.get("skills_invoked") or []
+    seen = set()
+    cleaned = []
+    for s in skills:
+        # split(":", 1) matches pre_skill.py / post_skill.py: only the FIRST ":"
+        # is treated as the plugin-namespace delimiter (per ADR 0012). A skill
+        # name like "foo:bar" (no plugin prefix) would be left intact.
+        bare = s.split(":", 1)[-1] if ":" in s else s
+        if bare not in seen:
+            seen.add(bare)
+            cleaned.append(bare)
+    data["skills_invoked"] = cleaned
+    data["schema_version"] = 2
+    return data
 
 
 @dataclass
@@ -139,6 +180,25 @@ class State:
             except OSError as e:
                 print(
                     f"[WARN by dev-rules] could not persist schema_version to {p}: {e}",
+                    file=sys.stderr,
+                )
+        # ADR 0018: migrate v1 state files (any with schema_version==1) to v2.
+        # This includes both files that started with v1 AND files just promoted
+        # from no-version to v1 by the legacy fill above.
+        if data.get("schema_version") == 1:
+            print(
+                "[INFO by dev-rules] state migrated v1 → v2 (skills_invoked deduped)",
+                file=sys.stderr,
+            )
+            data = _migrate_v1_to_v2(data)
+            try:
+                with _flocked(p, exclusive=True) as f:
+                    f.seek(0)
+                    f.truncate()
+                    f.write(json.dumps(data, indent=2, ensure_ascii=False))
+            except OSError as e:
+                print(
+                    f"[WARN by dev-rules] could not persist v2 migration to {p}: {e}",
                     file=sys.stderr,
                 )
         # 補齊新欄位（向前相容）

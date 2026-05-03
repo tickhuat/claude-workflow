@@ -16,7 +16,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.adr import rebuild_index, ADRError  # noqa: E402
-from lib.state import project_root, StateError  # noqa: E402
+from lib.state import phase_key, project_root, StateError  # noqa: E402
 
 
 def main() -> int:
@@ -78,14 +78,14 @@ def main() -> int:
                         rel_str = str(rel)
                         # Track touched files for current phase
                         touched_dict = s.data.setdefault("phase_files_touched", {})
-                        touched = touched_dict.setdefault(str(s.data["current_phase"]), [])
+                        touched = touched_dict.setdefault(phase_key(s.data["current_phase"]), [])
                         if rel_str not in touched and matches_any(rel_str, targets):
                             touched.append(rel_str)
                         # ADR 0014 / Issue #3: OR semantics — phase advances as soon
                         # as ANY touched file matches ANY target glob. Glob targets
                         # are "possibility sets", not checklists; TDD ordering is
                         # enforced separately by pre_edit (Issue #1).
-                        # touched is pre-filtered on append (line 74) so non-empty
+                        # touched is pre-filtered at append-time above, so non-empty
                         # touched implies at least one match — no need to re-check.
                         any_touched = bool(targets) and bool(touched)
                         if any_touched and not s.data["stage"].startswith("phase-"):

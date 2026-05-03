@@ -24,11 +24,11 @@ from lib.config import load_config  # noqa: E402
 from lib.glob_match import matches_any  # noqa: E402
 from lib.messages import format_block  # noqa: E402
 from lib.skills import EVENT_FLAG_TO_SKILL  # noqa: E402
-from lib.state import State, StateError, project_root  # noqa: E402
+from lib.state import State, StateError, phase_key, project_root  # noqa: E402
 
 
 def _phase_touched_tests(state: State, phase: int) -> bool:
-    touched = state.data.get("phase_files_touched", {}).get(str(phase), [])
+    touched = state.data.get("phase_files_touched", {}).get(phase_key(phase), [])
     return any(p.startswith("tests/") or "/tests/" in p for p in touched)
 
 
