@@ -41,7 +41,7 @@ Optionally edit `.claude/dev-rules.config.yaml` for your project's conventions.
 ### Install dependencies
 
 ```bash
-python3 -m pip install --user "PyYAML>=6.0" pytest
+python3 -m pip install -e ".[dev]"
 python3 -m pytest tests/ -q
 ```
 
@@ -154,15 +154,21 @@ This repo dogfoods its own dev-rules. Browse:
 
 These (and other dogfood files in `docs/superpowers/` and `ADR/`) are removed by `scripts/init-fresh.sh` when you start your own project.
 
-## Desktop Notifications (macOS)
+## Desktop Notifications (macOS / Linux)
 
-Optional macOS native notifications fire when:
+Optional desktop notifications fire when:
 
 - A Claude turn finishes (`stop` event)
 - Claude is waiting for your input or permission (`input` event)
 - A subagent task completes (`subagent_stop` event — useful when running
   many Agent tool calls back-to-back, since `stop` only fires once at the
   end of the whole turn, not per subagent)
+
+**Platform support** (per [ADR 0022](ADR/0022-notify-sh-cross-platform.md)):
+
+- macOS: uses built-in `osascript` (no install needed)
+- Linux / WSL: uses `notify-send` (install via `apt install libnotify-bin` on Debian/Ubuntu, `pacman -S libnotify` on Arch)
+- Other platforms: silently no-op; debug log records `platform=other`
 
 All default to **OFF**. Toggle by creating / removing flag files in `~/.claude/`:
 
@@ -181,11 +187,12 @@ rm -f ~/.claude/.notify-stop ~/.claude/.notify-input ~/.claude/.notify-subagent-
 ```
 
 `notify.sh` writes a per-invocation debug record to
-`~/.claude/.notify-debug.log` (timestamp, event, flag presence, osascript
-exit code, stderr). Use it to diagnose "sometimes rings, sometimes doesn't"
-— missing log line means the hook didn't fire (Claude Code event issue);
-present line with non-zero `osa_rc` means osascript itself failed (most
-commonly a notification permission issue under System Settings).
+`~/.claude/.notify-debug.log` (timestamp, event, platform, flag presence,
+tool used, exit code, stderr). Use it to diagnose "sometimes rings,
+sometimes doesn't" — missing log line means the hook didn't fire (Claude
+Code event issue); present line with non-zero `rc` means the notifier
+itself failed (most commonly a notification permission issue under System
+Settings on macOS, or `notify-send` not installed on Linux).
 
 The first notification triggers a macOS permission prompt — allow it under
 **System Settings → Notifications**. After that, changes take effect on the
@@ -197,8 +204,11 @@ If notifications don't fire:
 
 1. Check `~/.claude/.notify-debug.log` — each invocation writes one line
 2. `flag=no` → flag file missing (touch the right `~/.claude/.notify-*` file)
-3. `osa_rc=1` → osascript permission denied; allow under **System Settings → Notifications**
-4. No log line at all → hook didn't fire (Claude Code event matcher issue)
+3. `rc=127` + `tool=osascript` → osascript missing (shouldn't happen on macOS)
+4. `rc=127` + `tool=notify-send` → install libnotify (`apt install libnotify-bin`)
+5. `rc=1` + `tool=osascript` → osascript permission denied; allow under **System Settings → Notifications**
+6. `platform=other` → unsupported platform (BSD, Windows, etc.) — no-op by design
+7. No log line at all → hook didn't fire (Claude Code event matcher issue)
 
 ### Customizing message and sound
 

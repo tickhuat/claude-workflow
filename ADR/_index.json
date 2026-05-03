@@ -138,5 +138,19 @@
     "status": "Accepted",
     "file": "0020-using-git-worktrees-noop-transition.md",
     "summary": "把 `using-git-worktrees` 從 `lib/skills.py:SKILL_TO_STAGE` **移除**："
+  },
+  {
+    "id": "0021",
+    "title": "PEP 621 [project.optional-dependencies] for dev deps; CI installs via pip install -e \".[dev]\"",
+    "status": "Accepted",
+    "file": "0021-pep621-optional-dependencies.md",
+    "summary": "採用 **PEP 621 optional-dependencies**，把 dev 依賴集中宣告，CI 和 README 都從 `pyproject.toml` 安裝："
+  },
+  {
+    "id": "0022",
+    "title": "notify.sh cross-platform — osascript on macOS, notify-send on Linux/WSL",
+    "status": "Accepted",
+    "file": "0022-notify-sh-cross-platform.md",
+    "summary": "讓 `notify.sh` 自動偵測平台，呼叫對應的工具："
   }
 ]
