@@ -234,3 +234,22 @@ EOF
 )\""""
     r = run_pre_bash(cmd, tmp_project)
     assert r.returncode == 2
+
+
+def test_commit_heredoc_body_with_internal_quote_passes(tmp_project):
+    """Regression (cascade audit, Spec 2b): heredoc body containing internal "
+    must not cause _COMMIT_RE to truncate the captured message before the
+    Deviation: keyword. Heredoc regex must be tried FIRST."""
+    set_state(tmp_project, stage="exec-running", current_phase=1,
+              deviation_log=[{"phase": 1, "file": "src/x.py"}])
+    cmd = '''git commit -m "$(cat <<'EOF'
+feat: "quoted" stuff
+
+Deviation: small new dep
+EOF
+)"'''
+    r = run_pre_bash(cmd, tmp_project)
+    assert r.returncode == 0, (
+        f"heredoc body with internal quote + Deviation: keyword "
+        f"should PASS but was blocked. stderr={r.stderr!r}"
+    )

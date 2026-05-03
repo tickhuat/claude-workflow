@@ -79,17 +79,21 @@ def main() -> int:
         return 2
 
     # 1. git commit deviation note check.
-    # Try the simple -m "..." regex first (90% of commits). If that
-    # doesn't match, try the heredoc form. If neither matches, let
-    # post_bash ground-truth (ADR 0005) handle verification.
-    m_commit = _COMMIT_RE.search(cmd)
+    # Try the heredoc-form regex FIRST. _COMMIT_RE's lazy `(.+?)\1` with
+    # re.DOTALL would otherwise match the entire `"$(cat ...)"` literal up
+    # to the first internal `"` in the heredoc body — silently truncating
+    # the captured "message" and producing false-positive blocks when the
+    # body contains quotes (cascade audit, Spec 2b). Heredoc regex is
+    # strictly more specific (requires `\$\(\s*cat\s+<<`) so non-heredoc
+    # commits fall through cleanly to _COMMIT_RE.
     msg: str | None = None
-    if m_commit:
-        msg = m_commit.group(2)
+    m_heredoc = _COMMIT_HEREDOC_RE.search(cmd)
+    if m_heredoc:
+        msg = m_heredoc.group(2)  # heredoc body
     else:
-        m_heredoc = _COMMIT_HEREDOC_RE.search(cmd)
-        if m_heredoc:
-            msg = m_heredoc.group(2)  # heredoc body
+        m_commit = _COMMIT_RE.search(cmd)
+        if m_commit:
+            msg = m_commit.group(2)
     if msg is not None:
         cur_phase = s.data.get("current_phase") or 0
         deviations = [d for d in s.data.get("deviation_log", []) if d.get("phase") == cur_phase]
