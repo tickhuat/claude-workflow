@@ -19,6 +19,20 @@ from lib.state import State, StateError  # noqa: E402
 
 _COMMIT_RE = re.compile(r"^\s*git\s+commit\b.*?-\w*m\s+(['\"])(.+?)\1", re.DOTALL)
 
+# Heredoc-form: git commit ... -m "$(cat <<'TAG' ... TAG)" (with -am, --amend, etc.)
+# Tag may be quoted ('TAG' / "TAG") or unquoted (TAG). Group 1 is the tag,
+# group 2 is the heredoc body — what we treat as the commit message.
+# Why a separate regex: heredocs span multiple lines and contain arbitrary
+# quotes inside; the simple "(.+?)\1 closing-quote search of _COMMIT_RE
+# matches at the wrong position. post_bash.py (ADR 0005) is the ground
+# truth and would still catch a missed deviation, but matching here gives
+# the user an early signal at commit time rather than at push time.
+_COMMIT_HEREDOC_RE = re.compile(
+    r"^\s*git\s+commit\b[^<]*?-\w*m\s+\"\$\(\s*cat\s+<<\s*['\"]?(\w+)['\"]?\s*\n"
+    r"(.*?)\n\s*\1\s*\n?\s*\)\"",
+    re.DOTALL,
+)
+
 
 def main() -> int:
     raw = sys.stdin.read()
@@ -64,10 +78,19 @@ def main() -> int:
         ), file=sys.stderr)
         return 2
 
-    # 1. git commit deviation note check
+    # 1. git commit deviation note check.
+    # Try the simple -m "..." regex first (90% of commits). If that
+    # doesn't match, try the heredoc form. If neither matches, let
+    # post_bash ground-truth (ADR 0005) handle verification.
     m_commit = _COMMIT_RE.search(cmd)
+    msg: str | None = None
     if m_commit:
         msg = m_commit.group(2)
+    else:
+        m_heredoc = _COMMIT_HEREDOC_RE.search(cmd)
+        if m_heredoc:
+            msg = m_heredoc.group(2)  # heredoc body
+    if msg is not None:
         cur_phase = s.data.get("current_phase") or 0
         deviations = [d for d in s.data.get("deviation_log", []) if d.get("phase") == cur_phase]
         keyword = load_config()["commit_deviation_keyword"]
