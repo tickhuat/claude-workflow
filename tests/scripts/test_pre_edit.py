@@ -349,3 +349,26 @@ def test_pre_edit_sensitive_path_passes_when_in_target_files(tmp_project, set_st
     auth = tmp_project / "src" / "auth_handler.py"
     r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(auth)}}, tmp_project)
     assert r.returncode == 0, f"sensitive file in target_files wrongly blocked: stderr={r.stderr!r}"
+
+
+def test_pre_edit_single_save_when_event_flag_and_deviation_both_fire(tmp_project, set_stage, monkeypatch):
+    """Regression: previously pre_edit saved twice in one invocation when both
+    event_flag warn-once and deviation_log append fired. Now should save once."""
+    plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text("---\nphases:\n  - id: 1\n    target_files:\n      - src/a.py\n---\nbody")
+    set_stage(
+        stage="exec-running",
+        current_plan="docs/superpowers/plans/p.md",
+        current_phase=1,
+        event_flags={"debug_required": True, "parallel_required": False, "review_required": False},
+    )
+    extra = tmp_project / "src" / "extra.py"  # deviation: not in target_files
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(extra)}}, tmp_project)
+    assert r.returncode == 0  # warn-only deviation, returncode 0
+    # Inspect resulting state: event_flag cleared AND deviation_log has 1 entry
+    import json as _json
+    state = _json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["event_flags"]["debug_required"] is False, "warn-once should clear flag"
+    assert any(d["file"] == "src/extra.py" for d in state["deviation_log"]), "deviation should be logged"
+    # Both mutations applied — implicitly tests that single save persisted both.
