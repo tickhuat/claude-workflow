@@ -379,3 +379,27 @@ def test_pre_skill_warns_when_adrs_is_string(tmp_project):
     assert "[WARN by dev-rules]" in r.stderr
     assert "adrs" in r.stderr
     assert "list" in r.stderr.lower()
+
+
+def test_post_skill_auto_advance_does_not_overflow_phases_total(tmp_project, set_stage):
+    """Edge case: phases_verified is gappy and current_phase=N, but n+1 > phases_total.
+    Without the guard, current_phase would become n+1 (out of bounds)."""
+    # Setup: phases_total=3, current_phase=3, phases_verified empty (corrupted state).
+    # After this VERIFY-PASS phase=3 the all_done branch only fires when
+    # phases_verified ∪ {3} >= 3 — here that's [3], len 1, NOT all_done.
+    # So we go to else branch. n=3 == current_phase, n+1=4 > phases_total=3.
+    # New behaviour: warn + don't advance.
+    set_stage(stage="phase-3-done", current_phase=3, phases_total=3, phases_verified=[])
+    event = {
+        "tool_name": "Agent",
+        "tool_input": {"subagent_type": "general-purpose", "prompt": "..."},
+        "tool_response": {"content": [{"type": "text", "text": "VERIFY-PASS phase=3"}]},
+    }
+    r = run(POST, event, tmp_project)
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["current_phase"] == 3, "current_phase must NOT advance to 4"
+    assert state["stage"] in ("phase-3-verified",), (
+        f"stage stuck at phase-3-verified, got {state['stage']!r}"
+    )
+    assert "phases_total" in r.stderr or "not auto-advancing" in r.stderr

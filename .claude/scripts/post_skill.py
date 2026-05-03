@@ -137,7 +137,7 @@ def main() -> int:
             s.data["event_flags"][flag] = False
         _try_transition(s, skill)
         s.save()
-    if tool_name == "Agent":
+    elif tool_name == "Agent":
         text = _extract_agent_text(event.get("tool_response") or {})
         m_pass = re.search(r"VERIFY-PASS\s+phase=(\d+)", text)
         m_fail = re.search(r"VERIFY-FAIL\s+phase=(\d+)\s+reason=([^\n]+)", text)
@@ -167,6 +167,15 @@ def main() -> int:
                                 f"{s.data.get('current_phase')}; not auto-advancing.",
                                 file=sys.stderr,
                             )
+                        elif n + 1 > (s.data.get("phases_total") or 0):
+                            # Issue #14: edge-case guard against phases_verified being
+                            # gappy/corrupted (all_done branch wouldn't have fired).
+                            # Without this we'd set current_phase past phases_total.
+                            print(
+                                f"[WARN by dev-rules] VERIFY-PASS phase={n} but n+1 > "
+                                f"phases_total={s.data.get('phases_total')}; not auto-advancing.",
+                                file=sys.stderr,
+                            )
                         else:
                             s.set_stage("exec-running")
                             s.data["current_phase"] = n + 1
@@ -180,6 +189,7 @@ def main() -> int:
                 return 0
             s.data["last_verify_fail"] = f"phase={n}: {reason}"
             s.save()
+    # else: not our matcher (other PostToolUse hooks handle other tools)
     return 0
 
 

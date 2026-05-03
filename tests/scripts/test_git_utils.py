@@ -151,3 +151,38 @@ def test_parse_git_command_push_repo_flag_value_misclassified():
     # Current limitation: only one positional, so no refspec extracted
     assert r["subcommand"] == "push"
     assert r["dst_ref"] is None
+
+
+def test_git_common_dir_returns_dot_git_for_normal_repo(tmp_path):
+    from lib.git_utils import git_common_dir
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+    result = git_common_dir(tmp_path)
+    assert result is not None
+    assert result.resolve() == (tmp_path / ".git").resolve()
+
+
+def test_git_common_dir_returns_main_repo_dot_git_from_worktree(tmp_path):
+    """From inside a worktree, git_common_dir should return main repo's .git."""
+    from lib.git_utils import git_common_dir
+    main = tmp_path / "main"
+    main.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=main, check=True)
+    (main / "x.txt").write_text("x")
+    subprocess.run(["git", "add", "x.txt"], cwd=main, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=main, check=True)
+
+    wt = tmp_path / "wt1"
+    subprocess.run(["git", "worktree", "add", "-q", str(wt), "-b", "feat-x"], cwd=main, check=True)
+
+    result = git_common_dir(wt)
+    assert result is not None
+    # From wt1, common dir should resolve to main/.git
+    assert result.resolve() == (main / ".git").resolve()
+
+
+def test_git_common_dir_returns_none_outside_repo(tmp_path):
+    from lib.git_utils import git_common_dir
+    # tmp_path is just an empty directory, no git
+    assert git_common_dir(tmp_path) is None

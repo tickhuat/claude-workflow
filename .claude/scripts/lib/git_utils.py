@@ -97,3 +97,28 @@ def _extract_merge_target(args: list[str]) -> str | None:
         if not a.startswith("-"):
             return a
     return None
+
+
+def git_common_dir(cwd: Path) -> Path | None:
+    """Return git common dir (the main repo's .git, even from a worktree).
+
+    For a non-worktree repo, equals cwd/.git. For a worktree, equals the
+    main repo's .git. Returns None if cwd isn't inside any git repo or git
+    isn't installed.
+    """
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    p = Path(r.stdout.strip())
+    if not p.is_absolute():
+        p = (cwd / p).resolve()
+    return p

@@ -10,10 +10,34 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+from lib.git_utils import git_common_dir  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
 
 
 _ADR_RE = re.compile(r"^(\d{4}-[\w-]+)\.md$")
+
+
+def _resolve_adr_root(file_path: Path) -> Path | None:
+    """Return the directory that should contain ADR/<slug>.md, or None.
+
+    Checks (in order):
+    1. project_root() — normal case, file under main repo
+    2. main repo root via `git rev-parse --git-common-dir` — file under a worktree
+    """
+    candidates: list[Path] = [project_root()]
+    common = git_common_dir(project_root())
+    if common is not None:
+        # .git → repo root is its parent
+        main_root = common.parent
+        if main_root not in candidates:
+            candidates.append(main_root)
+    for root in candidates:
+        try:
+            file_path.relative_to(root)
+            return root
+        except ValueError:
+            continue
+    return None
 
 
 def main() -> int:
@@ -29,10 +53,16 @@ def main() -> int:
     file_path = (event.get("tool_input") or {}).get("file_path", "")
     if not file_path:
         return 0
+    fp = Path(file_path).resolve()
+
+    root = _resolve_adr_root(fp)
+    if root is None:
+        return 0
     try:
-        rel = Path(file_path).resolve().relative_to(project_root())
+        rel = fp.relative_to(root)
     except ValueError:
         return 0
+
     # Must be ADR/<NNNN>-<slug>.md
     if len(rel.parts) != 2 or rel.parts[0] != "ADR":
         return 0
@@ -43,8 +73,8 @@ def main() -> int:
     # Skip template
     if slug.startswith("0000-"):
         return 0
-    # File must actually exist (avoid logging Reads of non-existent files)
-    if not (project_root() / rel).exists():
+    # File must actually exist
+    if not (root / rel).exists():
         return 0
 
     try:
