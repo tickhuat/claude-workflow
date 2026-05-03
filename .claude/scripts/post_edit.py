@@ -50,7 +50,15 @@ def main() -> int:
     except StateError as e:
         print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
         return 0
-    if s.data["stage"] in ("exec-prep", "exec-running") and s.data.get("current_phase"):
+    # Include phase-N-done so subsequent edits in the same phase keep being
+    # tracked. ADR 0014 OR-semantics flips stage to phase-N-done on first match,
+    # but more files may be touched after that — they all belong to this phase.
+    stage = s.data["stage"]
+    is_exec_stage = (
+        stage in ("exec-prep", "exec-running")
+        or (stage.startswith("phase-") and stage.endswith("-done"))
+    )
+    if is_exec_stage and s.data.get("current_phase"):
         from lib.frontmatter import parse, FrontmatterError
         from lib.glob_match import matches_any
 
@@ -73,11 +81,14 @@ def main() -> int:
                         touched = touched_dict.setdefault(str(s.data["current_phase"]), [])
                         if rel_str not in touched and matches_any(rel_str, targets):
                             touched.append(rel_str)
-                        # All target globs covered?
-                        all_covered = bool(targets) and all(
-                            any(matches_any(t, [g]) for t in touched) for g in targets
-                        )
-                        if all_covered and not s.data["stage"].startswith("phase-"):
+                        # ADR 0014 / Issue #3: OR semantics — phase advances as soon
+                        # as ANY touched file matches ANY target glob. Glob targets
+                        # are "possibility sets", not checklists; TDD ordering is
+                        # enforced separately by pre_edit (Issue #1).
+                        # touched is pre-filtered on append (line 74) so non-empty
+                        # touched implies at least one match — no need to re-check.
+                        any_touched = bool(targets) and bool(touched)
+                        if any_touched and not s.data["stage"].startswith("phase-"):
                             s.set_stage(f"phase-{s.data['current_phase']}-done")
                         s.save()
                 except FrontmatterError:

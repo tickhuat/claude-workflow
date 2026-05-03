@@ -66,3 +66,29 @@ def test_corrupt_yaml_falls_back_to_defaults(tmp_project, capsys):
     assert cfg["auto_advance_phase"] is True
     err = capsys.readouterr().err
     assert "[WARN" in err or "config" in err.lower()
+
+
+def test_defaults_match_shipped_yaml():
+    """ADR 0015: DEFAULTS must match the shipped .claude/dev-rules.config.yaml exactly,
+    so that 'no yaml' deployments behave identically to dogfood."""
+    import yaml
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parents[2]
+    shipped_path = repo_root / ".claude" / "dev-rules.config.yaml"
+    shipped = yaml.safe_load(shipped_path.read_text())
+
+    # Re-import DEFAULTS fresh (avoid the module-level _CACHE)
+    import importlib
+    import sys
+    sys.path.insert(0, str(repo_root / ".claude" / "scripts"))
+    from lib import config as config_module
+    importlib.reload(config_module)
+    from lib.config import DEFAULTS
+
+    for key, value in shipped.items():
+        assert key in DEFAULTS, f"DEFAULTS missing key {key!r} from shipped yaml"
+        assert DEFAULTS[key] == value, (
+            f"DEFAULTS[{key!r}] diverged from shipped yaml.\n"
+            f"  shipped: {value!r}\n"
+            f"  DEFAULTS: {DEFAULTS[key]!r}"
+        )

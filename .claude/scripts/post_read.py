@@ -10,10 +10,35 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+from lib.git_utils import git_common_dir  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
 
 
 _ADR_RE = re.compile(r"^(\d{4}-[\w-]+)\.md$")
+
+
+def _resolve_adr_root(file_path: Path) -> Path | None:
+    """Return the directory that contains the ADR slug under file_path, or None.
+
+    Tries cheap project_root() first, only spawning `git rev-parse --git-common-dir`
+    (~6ms) if file is outside project_root — i.e. when running inside a worktree
+    while the ADR file lives in the main repo.
+    """
+    root = project_root()
+    try:
+        file_path.relative_to(root)
+        return root
+    except ValueError:
+        pass
+    common = git_common_dir(root)
+    if common is None:
+        return None
+    main_root = common.parent
+    try:
+        file_path.relative_to(main_root)
+        return main_root
+    except ValueError:
+        return None
 
 
 def main() -> int:
@@ -29,22 +54,32 @@ def main() -> int:
     file_path = (event.get("tool_input") or {}).get("file_path", "")
     if not file_path:
         return 0
+    fp = Path(file_path).resolve()
+
+    # Cheap basename check first — bail before any path resolution if filename
+    # isn't even ADR-shaped. This avoids running git_common_dir's subprocess on
+    # the 99% of Reads that aren't ADR files.
+    m = _ADR_RE.match(fp.name)
+    if not m:
+        return 0
+
+    root = _resolve_adr_root(fp)
+    if root is None:
+        return 0
     try:
-        rel = Path(file_path).resolve().relative_to(project_root())
+        rel = fp.relative_to(root)
     except ValueError:
         return 0
-    # Must be ADR/<NNNN>-<slug>.md
+
+    # Must be exactly ADR/<NNNN>-<slug>.md (not nested deeper)
     if len(rel.parts) != 2 or rel.parts[0] != "ADR":
-        return 0
-    m = _ADR_RE.match(rel.parts[1])
-    if not m:
         return 0
     slug = m.group(1)
     # Skip template
     if slug.startswith("0000-"):
         return 0
-    # File must actually exist (avoid logging Reads of non-existent files)
-    if not (project_root() / rel).exists():
+    # File must actually exist
+    if not (root / rel).exists():
         return 0
 
     try:

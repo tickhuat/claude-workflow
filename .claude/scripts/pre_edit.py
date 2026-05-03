@@ -4,14 +4,15 @@
 Rules in evaluation order:
 1. event_flags triggers (debug/parallel/review required → require corresponding skill)
 2. .claude/skills/** path → require writing-skills skill
-3. Global whitelist (*.md, docs/**, tests/**, .claude/**, ADR/**, etc.) → pass
-4. Stage gating (idle/session-started/spec-ready/plan-ready → block src edits)
-5. Exec-stage: target_files match, sensitive types, TDD, deviation counting
+3. Sensitive paths (auth*, schema*, migrations/**, *.config.*) → block unless in target_files
+4. Global whitelist (*.md, docs/**, tests/**, .claude/**, ADR/**, etc.) → pass
+5. Stage gating (idle/session-started/spec-ready/plan-ready → block src edits)
+6. Exec-stage: target_files match, TDD, deviation counting
 """
 from __future__ import annotations
 
-import fnmatch
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -22,46 +23,8 @@ from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.config import load_config  # noqa: E402
 from lib.glob_match import matches_any  # noqa: E402
 from lib.messages import format_block  # noqa: E402
+from lib.skills import EVENT_FLAG_TO_SKILL  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
-
-
-EVENT_FLAG_TO_SKILL = {
-    "debug_required": "systematic-debugging",
-    "parallel_required": "dispatching-parallel-agents",
-    "review_required": "receiving-code-review",
-}
-
-
-def _matches_any(rel: str, globs: list[str]) -> bool:
-    """Match rel path against any of the globs.
-
-    Supports:
-    - Extension globs: "*.md" matches "README.md" and "src/foo.md" (any .md anywhere)
-    - Prefix globs: "docs/**" matches "docs/x", "docs/a/b.txt", etc.
-    - Exact filenames: ".gitignore" matches ".gitignore" or "subdir/.gitignore"
-    - fnmatch patterns: "src/*.py" works on top-level src
-    """
-    rel_norm = rel.replace("\\", "/")
-    name = Path(rel_norm).name
-    for g in globs:
-        # 1. extension/leaf glob (no slash) — match against basename
-        if "/" not in g and "**" not in g:
-            if fnmatch.fnmatch(name, g):
-                return True
-            continue
-        # 2. prefix glob "X/**"
-        if g.endswith("/**"):
-            prefix = g[:-3]
-            if rel_norm == prefix or rel_norm.startswith(prefix + "/"):
-                return True
-            continue
-        # 3. literal path
-        if rel_norm == g:
-            return True
-        # 4. fnmatch fallback
-        if fnmatch.fnmatch(rel_norm, g):
-            return True
-    return False
 
 
 def _phase_touched_tests(state: State, phase: int) -> bool:
@@ -73,9 +36,18 @@ def _is_test_file(rel: str) -> bool:
     return rel.startswith("tests/") or "/tests/" in rel
 
 
+_TEST_SEGMENT_RE = re.compile(r"(^|/|_)test(s)?(/|_|\.|$)")
+
+
 def _targets_include_tests(targets: list[str]) -> bool:
-    """Return True if target_files contains any tests/** pattern."""
-    return any(_matches_any("tests/placeholder.py", [t]) or t.startswith("tests/") for t in targets)
+    """Return True if any target glob has 'test' or 'tests' as a path segment.
+
+    Used by the TDD gate to decide whether to enforce test-first ordering.
+    Recognises 'tests/**', '**/tests/**', '**/test_*.py', 'tests/foo.py',
+    'foo_test.go', etc. Rejects substring matches like 'latest/**',
+    'protests/**', 'contests/foo.py' to avoid spurious TDD enforcement.
+    """
+    return any(_TEST_SEGMENT_RE.search(g.lower()) for g in targets)
 
 
 def main() -> int:
@@ -141,11 +113,46 @@ def main() -> int:
         # writing-skills was called → fall through to global whitelist check below
         # (.claude/** is in whitelist so will pass)
 
-    # 3. Global whitelist passes
-    if _matches_any(rel, global_whitelist):
+    # 3. Sensitive paths must be checked BEFORE global_whitelist.
+    # ADR 0014 made *.json/*.yaml/*.toml etc. recursively-matching, so a
+    # sensitive file like `src/migrations/001.json` would pass `*.json`
+    # whitelist before ever reaching the sensitive check. CLAUDE.md promises
+    # sensitive paths outside target_files always require new ADR — enforce
+    # that by gating here. Exception: if there's an active plan and the file
+    # is in current phase's target_files, the user explicitly approved.
+    if matches_any(rel, sensitive_globs):
+        cur_phase = s.data.get("current_phase") or 0
+        plan_rel = s.data.get("current_plan")
+        in_targets = False
+        if plan_rel and cur_phase:
+            plan_path = project_root() / plan_rel
+            if plan_path.exists():
+                from lib.frontmatter import parse, FrontmatterError
+                try:
+                    fm, _ = parse(plan_path.read_text())
+                    cur = next((p for p in (fm.get("phases") or []) if int(p.get("id", -1)) == cur_phase), None)
+                    if cur:
+                        targets = cur.get("target_files") or []
+                        in_targets = matches_any(rel, targets)
+                except FrontmatterError:
+                    pass
+        if not in_targets:
+            print(format_block(
+                problem=f"碰到敏感類型 ({rel})，需新 ADR 解釋（或加進 plan target_files）。",
+                stage=stage,
+                phase=cur_phase if cur_phase else None,
+                actions=[
+                    "新增 ADR 描述此變更原因（schema/auth/config/migration）",
+                    "或若這是預期內變更，把它加進 plan target_files",
+                ],
+            ), file=sys.stderr)
+            return 2
+
+    # 4. Global whitelist passes
+    if matches_any(rel, global_whitelist):
         return 0
 
-    # 4. Stage gating (Phase 2 logic)
+    # 5. Stage gating (Phase 2 logic)
     if stage in ("idle", "session-started"):
         print(format_block(
             problem=f"在 stage={stage} 不可 Edit src（{rel}）。",
@@ -168,7 +175,7 @@ def main() -> int:
         ), file=sys.stderr)
         return 2
 
-    # 5. Exec-stage rules
+    # 6. Exec-stage rules (sensitive check already done at step 3)
     if stage in ("exec-prep", "exec-running") or (stage.startswith("phase-") and stage.endswith("-done")):
         cur_phase = s.data.get("current_phase") or 0
         plan_rel = s.data.get("current_plan")
@@ -185,8 +192,8 @@ def main() -> int:
                 except FrontmatterError:
                     pass
 
-        # 5a. target_files match → pass (with TDD check)
-        if _matches_any(rel, targets):
+        # 6a. target_files match → pass (with TDD check)
+        if matches_any(rel, targets):
             # TDD: src/** writes require prior tests/** writes in this phase
             # Only enforce TDD when the plan also includes tests/** in target_files
             if rel.startswith("src/") and not _is_test_file(rel) and _targets_include_tests(targets):
@@ -203,17 +210,7 @@ def main() -> int:
                     return 2
             return 0
 
-        # 5b. sensitive types → block
-        if matches_any(rel, sensitive_globs):
-            print(format_block(
-                problem=f"碰到敏感類型 ({rel})，需新 ADR 解釋。",
-                stage=stage,
-                phase=cur_phase,
-                actions=["新增 ADR 描述此變更原因（schema/auth/config/migration）"],
-            ), file=sys.stderr)
-            return 2
-
-        # 5c/5d. deviation counting
+        # 6b. deviation counting (sensitive check moved to step 3)
         already_logged = {d["file"] for d in s.data.get("deviation_log", []) if d.get("phase") == cur_phase}
         projected_unique = already_logged | {rel}
         new_count = len(projected_unique)

@@ -11,6 +11,8 @@ from lib.state import project_root
 
 
 DEFAULTS: dict[str, Any] = {
+    # ADR 0015: this dict MUST mirror .claude/dev-rules.config.yaml exactly.
+    # test_defaults_match_shipped_yaml enforces this.
     "sensitive_globs": [
         "**/migrations/**",
         "**/schema*",
@@ -23,9 +25,20 @@ DEFAULTS: dict[str, Any] = {
         "review_required": [r"\breview\b", "PR comment", r"\bfeedback\b"],
     },
     "global_whitelist": [
-        "*.md", "*.css", "*.json", "*.toml",
-        "docs/**", ".claude/**", "tests/**", "ADR/**",
-        ".gitignore", "pyproject.toml",
+        "*.md",
+        "*.css",
+        "*.json",
+        "*.toml",
+        "*.yml",
+        "*.yaml",
+        "docs/**",
+        ".claude/**",
+        ".github/**",
+        "tests/**",
+        "ADR/**",
+        "scripts/**",
+        ".gitignore",
+        "pyproject.toml",
     ],
     "auto_advance_phase": True,
     "commit_deviation_keyword": "Deviation:",

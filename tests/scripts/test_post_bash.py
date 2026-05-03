@@ -132,3 +132,25 @@ def test_rebase_in_progress_skips_check(tmp_project):
     assert r.returncode == 0
     state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
     assert state.get("last_commit_violation") is None
+
+
+def test_exit_code_none_skips_check(tmp_project):
+    """W3: When exit_code is None (event structure unknown), skip — do not record violation."""
+    _git_init_with_commit(tmp_project, "feat: foo")
+    _set_state(tmp_project, stage="exec-running", current_phase=1,
+               deviation_log=[{"phase": 1, "file": "src/x.py"}])
+    # tool_response without exit_code
+    r = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps({
+            "tool_name": "Bash",
+            "tool_input": {"command": "git commit -m 'feat: foo'"},
+            "tool_response": {},  # no exit_code
+        }),
+        capture_output=True, text=True,
+        cwd=tmp_project,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
+    )
+    assert r.returncode == 0
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state.get("last_commit_violation") is None, "None exit_code must not trigger violation recording"

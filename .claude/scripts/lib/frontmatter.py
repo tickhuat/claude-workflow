@@ -29,7 +29,15 @@ def _normalize(obj: Any) -> Any:
 
 
 def parse(text: str) -> tuple[dict[str, Any], str]:
-    """Return (frontmatter_dict, body_str). Empty dict if no frontmatter."""
+    """Return (frontmatter_dict, body_str). Empty dict if no frontmatter.
+
+    Contract notes:
+    - YAML date / datetime values are normalized to ISO 8601 strings;
+      consumers should not expect datetime.date or datetime.datetime objects.
+      (E.g. `date: 2026-05-02` parses to the string '2026-05-02'.)
+    - Other YAML scalars (str, int, bool, None) and containers (list, dict)
+      pass through with their natural Python types.
+    """
     if not text.startswith(_FENCE):
         return {}, text
     parts = re.split(r"^---[ \t]*$", text, maxsplit=2, flags=re.MULTILINE)

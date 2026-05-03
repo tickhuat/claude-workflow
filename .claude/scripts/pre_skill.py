@@ -19,10 +19,8 @@ from lib.adr import index_path  # noqa: E402
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.frontmatter import FrontmatterError, parse  # noqa: E402
 from lib.messages import format_block  # noqa: E402
+from lib.skills import GATED_SKILLS as _GATED_SKILLS  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
-
-
-_GATED_SKILLS = {"brainstorming", "writing-plans"}
 
 
 def _required_adrs(state: State) -> list[str]:
@@ -42,6 +40,12 @@ def _required_adrs(state: State) -> list[str]:
         adrs = fm.get("adrs") or []
         if isinstance(adrs, list):
             return [str(s) for s in adrs]
+        # adrs present but wrong shape (e.g. bare string) — warn loudly so user notices
+        print(
+            f"[WARN by dev-rules] frontmatter 'adrs' must be a list "
+            f"(got {type(adrs).__name__}); skipping. See ADR/0000-template.md for format.",
+            file=sys.stderr,
+        )
     # Fallback: all ADRs in _index.json
     ip = index_path()
     if not ip.exists():

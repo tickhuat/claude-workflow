@@ -82,5 +82,33 @@
     "status": "Accepted",
     "file": "0012-strip-skill-namespace-prefix.md",
     "summary": "在 hook **入口**對 `tool_input.skill` 做 namespace strip："
+  },
+  {
+    "id": "0013",
+    "title": "Stage name validation in set_stage; remove unused can_transition",
+    "status": "Accepted",
+    "file": "0013-stage-name-validation.md",
+    "summary": "把 `lib/state.py` 重構成「stage name 是受驗證的型別」："
+  },
+  {
+    "id": "0014",
+    "title": "Replace custom glob_match with pathspec library; unify all glob matching",
+    "status": "Accepted",
+    "file": "0014-pathspec-glob-unification.md",
+    "summary": "引入 [`pathspec`](https://pypi.org/project/pathspec/)（Python `.gitignore` 規格實作）作為**唯一** glob 實作："
+  },
+  {
+    "id": "0015",
+    "title": "Sync lib/config.py DEFAULTS with shipped dev-rules.config.yaml; add consistency test",
+    "status": "Accepted",
+    "file": "0015-defaults-yaml-sync.md",
+    "summary": "採「**shipped yaml 是 source-of-truth、DEFAULTS 同步它**」原則："
+  },
+  {
+    "id": "0016",
+    "title": "Centralize skill-to-stage / skill-clears-flag / event-flag tables in lib/skills.py",
+    "status": "Accepted",
+    "file": "0016-centralize-skill-tables.md",
+    "summary": "新增 [`lib/skills.py`](.claude/scripts/lib/skills.py)，集中所有 skill metadata："
   }
 ]

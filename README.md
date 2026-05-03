@@ -188,6 +188,15 @@ The first notification triggers a macOS permission prompt — allow it under
 **System Settings → Notifications**. After that, changes take effect on the
 next Claude session restart (hooks are registered at session start).
 
+### Troubleshooting
+
+If notifications don't fire:
+
+1. Check `~/.claude/.notify-debug.log` — each invocation writes one line
+2. `flag=no` → flag file missing (touch the right `~/.claude/.notify-*` file)
+3. `osa_rc=1` → osascript permission denied; allow under **System Settings → Notifications**
+4. No log line at all → hook didn't fire (Claude Code event matcher issue)
+
 ### Customizing message and sound
 
 Edit [.claude/scripts/notify.sh](.claude/scripts/notify.sh) to change the

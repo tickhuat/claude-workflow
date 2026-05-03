@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -95,26 +96,12 @@ class State:
             self.data["skills_invoked"].append(skill)
 
     def set_stage(self, new_stage: str) -> None:
+        assert is_valid_stage(new_stage), f"invalid stage: {new_stage!r}"
         self.data["stage"] = new_stage
         self.data["last_transition"] = datetime.now(timezone.utc).isoformat()
 
     def has_skill(self, skill: str) -> bool:
         return skill in self.data["skills_invoked"]
-
-
-VALID_STAGES: list[str] = [
-    "idle",
-    "session-started",
-    "spec-ready",
-    "plan-ready",
-    "exec-prep",
-    "exec-running",
-    "phase-1-done",      # concrete phase-1 entries to satisfy test
-    "phase-1-verified",
-    "all-phases-verified",
-    "reviewed",
-    "done",
-]
 
 
 # linear forward order; phase-N-* 由 transition 邏輯處理
@@ -123,47 +110,22 @@ _STAGE_ORDER = {s: i for i, s in enumerate([
     "exec-prep", "exec-running", "all-phases-verified", "reviewed", "done",
 ])}
 
-
-def can_transition(src: str, dst: str) -> bool:
-    """允許正向相鄰 transition；phase-N-* 視為 exec-running 內部循環。"""
-    if src == dst:
-        return False
-    if src.startswith("phase-") or dst.startswith("phase-"):
-        return _phase_transition_allowed(src, dst)
-    if src not in _STAGE_ORDER or dst not in _STAGE_ORDER:
-        return False
-    return _STAGE_ORDER[dst] == _STAGE_ORDER[src] + 1
+_PHASE_STAGE_RE = re.compile(r"^phase-([1-9][0-9]*)-(done|verified)$")
 
 
-def _phase_transition_allowed(src: str, dst: str) -> bool:
-    if src == "exec-running" and dst.endswith("-done") and dst.startswith("phase-"):
+def is_valid_stage(s: str) -> bool:
+    """Return True iff s is a recognised stage name.
+
+    Recognised stages:
+    - lifecycle stages in _STAGE_ORDER (idle, session-started, ..., done)
+    - phase-N-done / phase-N-verified where N is a positive integer
+    """
+    if s in _STAGE_ORDER:
         return True
-    if src.endswith("-done") and dst.endswith("-verified") and src[:-5] == dst[:-9]:
-        return True
-    if src.endswith("-verified") and dst == "exec-running":
-        return True
-    if src.endswith("-verified") and dst == "all-phases-verified":
-        return True
-    return False
+    return bool(_PHASE_STAGE_RE.match(s))
 
 
-_SKILL_TO_STAGE: dict[str, dict[str, str | None]] = {
-    "brainstorming": {"session-started": "spec-ready"},
-    "writing-plans": {"spec-ready": "plan-ready"},
-    "executing-plans": {"plan-ready": "exec-running", "exec-prep": "exec-running"},
-    "subagent-driven-development": {"plan-ready": "exec-running", "exec-prep": "exec-running"},
-    "using-git-worktrees": {"plan-ready": "exec-prep"},
-    "requesting-code-review": {"all-phases-verified": "reviewed"},
-    "finishing-a-development-branch": {"reviewed": "done"},
-    "using-superpowers": {"idle": "session-started"},
-}
-
-
-def next_stage_after_skill(skill: str, current_stage: str) -> str | None:
-    table = _SKILL_TO_STAGE.get(skill)
-    if not table:
-        return None
-    target = table.get(current_stage)
-    if target and target != current_stage:
-        return target
-    return None
+# Skill metadata moved to lib/skills.py (ADR 0016). Re-exported here for backward
+# compatibility — existing callers that do `from lib.state import next_stage_after_skill`
+# keep working.
+from lib.skills import next_stage_after_skill  # noqa: E402, F401

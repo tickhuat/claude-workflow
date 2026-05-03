@@ -12,14 +12,12 @@ sys.path.insert(0, str(HERE))
 
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.config import load_config  # noqa: E402
+from lib.git_utils import parse_git_command  # noqa: E402
 from lib.messages import format_block  # noqa: E402
 from lib.state import State, StateError  # noqa: E402
 
 
 _COMMIT_RE = re.compile(r"^\s*git\s+commit\b.*?-\w*m\s+(['\"])(.+?)\1", re.DOTALL)
-_PUSH_MAIN_RE = re.compile(r"^\s*git\s+push\b.*\b(main|master)\b")
-_MERGE_MAIN_RE = re.compile(r"^\s*git\s+merge\b.*\b(main|master)\b")
-_PUSH_OR_MERGE_RE = re.compile(r"^\s*git\s+(push|merge)\b")
 
 
 def main() -> int:
@@ -49,8 +47,10 @@ def main() -> int:
         log_bypass(hook="pre_bash", tool="Bash", tool_input={"command": cmd}, stage=s.data["stage"])
         return 0
 
+    parsed = parse_git_command(cmd)
+
     # 0. last_commit_violation 擋所有 git push / git merge
-    if s.data.get("last_commit_violation") is not None and _PUSH_OR_MERGE_RE.match(cmd):
+    if s.data.get("last_commit_violation") is not None and parsed is not None and parsed["subcommand"] in ("push", "merge"):
         v = s.data["last_commit_violation"]
         keyword = load_config()["commit_deviation_keyword"]
         print(format_block(
@@ -85,7 +85,17 @@ def main() -> int:
         return 0
 
     # 2. git push/merge to main/master
-    if _PUSH_MAIN_RE.search(cmd) or _MERGE_MAIN_RE.search(cmd):
+    is_push_to_main = (
+        parsed is not None
+        and parsed["subcommand"] == "push"
+        and parsed.get("dst_ref") in ("main", "master")
+    )
+    is_merge_main = (
+        parsed is not None
+        and parsed["subcommand"] == "merge"
+        and parsed.get("target_ref") in ("main", "master")
+    )
+    if is_push_to_main or is_merge_main:
         stage = s.data["stage"]
         if stage == "done":
             return 0

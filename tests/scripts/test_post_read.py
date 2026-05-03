@@ -78,3 +78,76 @@ def test_post_read_ignores_non_existing_file(tmp_project):
     if state_p.exists():
         state = json.loads(state_p.read_text())
         assert "9999-ghost" not in state["adrs_read"]
+
+
+def test_records_adr_read_from_worktree(tmp_path):
+    """From inside a worktree, reading ADR/X.md (which lives in main repo) should
+    record the slug. Issue #5 — previously raised ValueError and silently skipped."""
+    main = tmp_path / "main"
+    main.mkdir()
+    (main / ".claude").mkdir()
+    (main / "ADR").mkdir()
+    (main / "ADR" / "0001-foo.md").write_text("---\nid: 0001\n---\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=main, check=True)
+    subprocess.run(["git", "add", "."], cwd=main, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=main, check=True)
+
+    wt = tmp_path / "wt1"
+    subprocess.run(["git", "worktree", "add", "-q", str(wt), "-b", "feat-x"], cwd=main, check=True)
+
+    # The ADR file path under the worktree (it's symlinked / shared in checkout)
+    adr_in_wt = wt / "ADR" / "0001-foo.md"
+    assert adr_in_wt.exists()
+
+    # CLAUDE_PROJECT_DIR points to the worktree (typical worktree usage)
+    r = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps({"tool_name": "Read", "tool_input": {"file_path": str(adr_in_wt)}}),
+        capture_output=True, text=True,
+        cwd=wt,
+        env={"CLAUDE_PROJECT_DIR": str(wt), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
+    )
+    assert r.returncode == 0, f"stderr: {r.stderr}"
+    state = json.loads((wt / ".claude" / "dev-state.json").read_text())
+    assert "0001-foo" in state["adrs_read"], (
+        f"Worktree ADR read should be recorded; adrs_read={state['adrs_read']}"
+    )
+
+
+def test_records_adr_read_via_main_repo_path_from_worktree(tmp_path):
+    """Stronger Issue #5 regression: file_path is the MAIN repo's ADR path while
+    CLAUDE_PROJECT_DIR is the worktree. Without _resolve_adr_root's git-common-dir
+    fallback this case raises ValueError on relative_to() and silently skips."""
+    main = tmp_path / "main"
+    main.mkdir()
+    (main / "ADR").mkdir()
+    (main / "ADR" / "0042-cross.md").write_text("---\nid: 0042\n---\n")
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=main, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=main, check=True)
+    subprocess.run(["git", "add", "."], cwd=main, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=main, check=True)
+
+    wt = tmp_path / "wt1"
+    (wt.parent / ".claude").mkdir(exist_ok=True)
+    subprocess.run(["git", "worktree", "add", "-q", str(wt), "-b", "feat-x"], cwd=main, check=True)
+    (wt / ".claude").mkdir(exist_ok=True)
+
+    # Crucial: file_path uses MAIN repo's ADR path (not the worktree's checkout)
+    adr_in_main = main / "ADR" / "0042-cross.md"
+    assert adr_in_main.exists()
+
+    r = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps({"tool_name": "Read", "tool_input": {"file_path": str(adr_in_main)}}),
+        capture_output=True, text=True,
+        cwd=wt,
+        env={"CLAUDE_PROJECT_DIR": str(wt), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
+    )
+    assert r.returncode == 0, f"stderr: {r.stderr}"
+    state = json.loads((wt / ".claude" / "dev-state.json").read_text())
+    assert "0042-cross" in state["adrs_read"], (
+        f"Cross-worktree ADR read should be recorded; adrs_read={state['adrs_read']}"
+    )
