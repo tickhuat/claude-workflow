@@ -51,9 +51,21 @@ def _flocked(path: Path, exclusive: bool):
             try:
                 yield f
             finally:
+                # CRITICAL: flush write buffer BEFORE releasing the lock.
+                # Without this, a writer's f.write() may sit in user-space
+                # buffer when LOCK_UN fires; another reader then acquires
+                # LOCK_SH and reads an empty (just-truncated) file.
+                # Caught by CI flake on ubuntu-latest 3.10.
+                if exclusive:
+                    f.flush()
                 _fcntl.flock(f.fileno(), _fcntl.LOCK_UN)
         else:
+            # No fcntl (Windows) — degrades to no-lock. Flush before close to
+            # match the locked-mode invariant; close() would flush anyway, but
+            # being explicit signals the intent.
             yield f
+            if exclusive:
+                f.flush()
 
 
 class StateError(RuntimeError):
