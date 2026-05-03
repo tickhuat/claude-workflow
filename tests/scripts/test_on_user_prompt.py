@@ -74,6 +74,21 @@ def test_no_flag_when_no_keyword(tmp_project):
         assert state["event_flags"]["debug_required"] is False
 
 
+def test_event_flags_reset_each_prompt(tmp_project):
+    """Each prompt re-evaluates flags from scratch; previous true flags
+    that no longer match keywords should be cleared."""
+    # First prompt sets debug_required
+    run_hook({"prompt": "there is a bug in the system"}, tmp_project)
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["event_flags"]["debug_required"] is True
+
+    # Second prompt has no keywords — flag should be reset to false
+    run_hook({"prompt": "how does this function work"}, tmp_project)
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["event_flags"]["debug_required"] is False, \
+        "Flag should be reset on each prompt; previous prompts must not stick"
+
+
 def test_on_user_prompt_respects_custom_keywords(tmp_project):
     cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
     cfg.write_text(

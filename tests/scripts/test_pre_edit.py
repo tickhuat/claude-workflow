@@ -135,19 +135,6 @@ def test_pre_edit_blocks_skills_dir_until_writing_skills(tmp_project, set_stage)
     assert "writing-skills" in r.stderr
 
 
-def test_pre_edit_blocks_when_debug_required(tmp_project, set_stage):
-    set_stage(stage="exec-running")
-    # set_stage doesn't expose nested updates directly; reload and update
-    sp = tmp_project / ".claude" / "dev-state.json"
-    state = json.loads(sp.read_text())
-    state["event_flags"]["debug_required"] = True
-    sp.write_text(json.dumps(state))
-    src = tmp_project / "src" / "a.py"
-    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(src)}}, tmp_project)
-    assert r.returncode == 2
-    assert "systematic-debugging" in r.stderr
-
-
 def test_pre_edit_tdd_blocks_src_without_tests(tmp_project, set_stage):
     plan = tmp_project / "docs" / "superpowers" / "plans" / "p.md"
     plan.parent.mkdir(parents=True, exist_ok=True)
@@ -294,6 +281,57 @@ def test_pre_edit_sensitive_path_blocked_even_when_extension_whitelisted(tmp_pro
     r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(sensitive)}}, tmp_project)
     assert r.returncode == 2, f"sensitive file slipped past whitelist: stderr={r.stderr!r}"
     assert "敏感" in r.stderr or "ADR" in r.stderr
+
+
+def test_pre_edit_event_flag_warns_then_clears_instead_of_blocking(tmp_project, set_stage):
+    """ADR 0017: event_flag triggers a WARN (exit 0 + stderr) and clears
+    the flag, instead of BLOCK (exit 2)."""
+    set_stage(stage="exec-running", current_phase=1)
+    sp = tmp_project / ".claude" / "dev-state.json"
+    state = json.loads(sp.read_text())
+    state["event_flags"]["debug_required"] = True
+    sp.write_text(json.dumps(state))
+
+    src = tmp_project / "src" / "a.py"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(src)}}, tmp_project)
+
+    assert r.returncode == 0, f"event_flag should WARN not BLOCK; stderr={r.stderr!r}"
+    assert "[WARN" in r.stderr, "should print stderr warning"
+    assert "systematic-debugging" in r.stderr, "warning should mention the suggested skill"
+
+    # Flag should now be false (warn-once semantics)
+    state2 = json.loads(sp.read_text())
+    assert state2["event_flags"]["debug_required"] is False, \
+        "warn-once: flag should clear after warning"
+
+
+def test_pre_edit_event_flag_no_warn_when_already_false(tmp_project, set_stage):
+    """If flag is already false, no warning fires."""
+    set_stage(stage="exec-running", current_phase=1)
+    src = tmp_project / "src" / "a.py"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(src)}}, tmp_project)
+    assert r.returncode == 0
+    assert "event flag" not in r.stderr.lower()
+
+
+def test_pre_edit_event_flag_skill_invocation_still_passes(tmp_project, set_stage):
+    """Round 1 behavior: invoking the corresponding skill still passes
+    (idempotent — flag may already be false from warn-once)."""
+    set_stage(stage="exec-running", current_phase=1, skills_invoked=["systematic-debugging"])
+    sp = tmp_project / ".claude" / "dev-state.json"
+    state = json.loads(sp.read_text())
+    state["event_flags"]["debug_required"] = True
+    sp.write_text(json.dumps(state))
+    src = tmp_project / "src" / "a.py"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    r = run_pre({"tool_name": "Edit", "tool_input": {"file_path": str(src)}}, tmp_project)
+    # Should pass — skill is invoked, no warn needed
+    assert r.returncode == 0
+    # Skill is invoked, so the inner "if not has_skill" branch doesn't fire — no warn line
+    assert not any("event flag" in line for line in r.stderr.lower().split("\n")), \
+        f"warning should not fire when skill is invoked: {r.stderr!r}"
 
 
 def test_pre_edit_sensitive_path_passes_when_in_target_files(tmp_project, set_stage):

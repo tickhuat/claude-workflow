@@ -55,7 +55,6 @@ stateDiagram-v2
     idle --> session_started: using-superpowers
     session_started --> spec_ready: brainstorming + spec w/ adrs
     spec_ready --> plan_ready: writing-plans + plan w/ phases
-    plan_ready --> exec_prep: using-git-worktrees
     plan_ready --> exec_running: executing-plans
     exec_prep --> exec_running: executing-plans
     exec_running --> phase_N_done: target_files all touched
@@ -68,6 +67,8 @@ stateDiagram-v2
 ```
 
 Stage names use hyphens (e.g. `session-started`); the diagram uses underscores because Mermaid identifiers can't contain hyphens.
+
+**Tool-style skills**: `using-git-worktrees` is a tool, not a state transition. It can be invoked at any stage (idle, plan-ready, exec-running, done, etc.) without advancing the dev-rules state machine. Use it whenever you need an isolated workspace. (See ADR 0020.)
 
 ### Hooks
 
@@ -100,6 +101,8 @@ All hook scripts are Python 3 stdlib + PyYAML, sourced from `.claude/scripts/`.
 3. **Read ADRs first** — `pre_skill` checks `state.adrs_read` against required ADRs. `post_read` auto-records ADR slugs when the Read tool is used on `ADR/<slug>.md`.
 4. **Phase verification** — Each plan phase declares `target_files` (globs) and `verify_command`. `post_edit` tracks target file coverage; once all target globs are touched, stage moves to `phase-N-done`. The next Edit is blocked until a fresh Agent subagent returns `VERIFY-PASS phase=N`.
 5. **Conventional paths** — Specs in `docs/superpowers/specs/`, plans in `docs/superpowers/plans/`, ADRs in `ADR/`. Sensitive globs (`**/auth*`, `**/migrations/**`, etc.) always require a new ADR.
+
+**Event flags** (`debug_required`, `parallel_required`, `review_required`) are detected from prompt keywords by `on_user_prompt`. They emit a one-time WARN to stderr on the next `Edit` and clear themselves; they do **not** block edits (per [ADR 0017](ADR/0017-event-flag-prompt-scope.md), reverted from the original "persistent BLOCK until skill invoked" design after that proved over-aggressive in practice).
 
 ## File structure
 

@@ -110,5 +110,33 @@
     "status": "Accepted",
     "file": "0016-centralize-skill-tables.md",
     "summary": "新增 [`lib/skills.py`](.claude/scripts/lib/skills.py)，集中所有 skill metadata："
+  },
+  {
+    "id": "0017",
+    "title": "event_flags scoped to single user prompt; warn-once instead of persistent block",
+    "status": "Accepted",
+    "file": "0017-event-flag-prompt-scope.md",
+    "summary": "把 `event_flags` 從「persistent until skill invoked」改為「**per-prompt scoped + warn-once**」："
+  },
+  {
+    "id": "0018",
+    "title": "state schema v2 migration — strip namespace from skills_invoked + dedupe",
+    "status": "Accepted",
+    "file": "0018-state-schema-v2-migration.md",
+    "summary": "在 `lib/state.py` 新增 `_migrate_v1_to_v2(data)` 並在 `State.load()` 流程中觸發："
+  },
+  {
+    "id": "0019",
+    "title": "Add fcntl.flock around dev-state.json read-modify-write",
+    "status": "Accepted",
+    "file": "0019-state-file-flock.md",
+    "summary": "在 `lib/state.py` 包裝 `State.load()` 和 `State.save()` 用 `fcntl.flock`："
+  },
+  {
+    "id": "0020",
+    "title": "using-git-worktrees as no-op skill (no stage transition)",
+    "status": "Accepted",
+    "file": "0020-using-git-worktrees-noop-transition.md",
+    "summary": "把 `using-git-worktrees` 從 `lib/skills.py:SKILL_TO_STAGE` **移除**："
   }
 ]
