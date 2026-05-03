@@ -16,15 +16,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from lib.state import State, StateError, next_stage_after_skill, project_root  # noqa: E402
 from lib.frontmatter import parse, FrontmatterError  # noqa: E402
-
-
-SKILL_CLEARS_FLAG = {
-    "systematic-debugging": "debug_required",
-    "dispatching-parallel-agents": "parallel_required",
-    "receiving-code-review": "review_required",
-}
+from lib.skills import SKILL_CLEARS_FLAG  # noqa: E402
+from lib.state import State, StateError, next_stage_after_skill, project_root  # noqa: E402
 
 
 def _newest(globs: list[str]) -> Path | None:
@@ -83,7 +77,7 @@ def _try_transition(state: State, skill: str) -> None:
     target = next_stage_after_skill(skill, state.data["stage"])
     if not target:
         return
-    # _SKILL_TO_STAGE is authoritative; no extra can_transition gate needed.
+    # SKILL_TO_STAGE (lib/skills.py) is authoritative; no extra can_transition gate needed.
     # (exec-prep is optional: executing-plans may jump plan-ready → exec-running)
     if target == "spec-ready":
         ok, spec = _check_spec()

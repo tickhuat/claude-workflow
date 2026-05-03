@@ -125,23 +125,7 @@ def is_valid_stage(s: str) -> bool:
     return bool(_PHASE_STAGE_RE.match(s))
 
 
-_SKILL_TO_STAGE: dict[str, dict[str, str | None]] = {
-    "brainstorming": {"session-started": "spec-ready"},
-    "writing-plans": {"spec-ready": "plan-ready"},
-    "executing-plans": {"plan-ready": "exec-running", "exec-prep": "exec-running"},
-    "subagent-driven-development": {"plan-ready": "exec-running", "exec-prep": "exec-running"},
-    "using-git-worktrees": {"plan-ready": "exec-prep"},
-    "requesting-code-review": {"all-phases-verified": "reviewed"},
-    "finishing-a-development-branch": {"reviewed": "done"},
-    "using-superpowers": {"idle": "session-started"},
-}
-
-
-def next_stage_after_skill(skill: str, current_stage: str) -> str | None:
-    table = _SKILL_TO_STAGE.get(skill)
-    if not table:
-        return None
-    target = table.get(current_stage)
-    if target and target != current_stage:
-        return target
-    return None
+# Skill metadata moved to lib/skills.py (ADR 0016). Re-exported here for backward
+# compatibility — existing callers that do `from lib.state import next_stage_after_skill`
+# keep working.
+from lib.skills import next_stage_after_skill  # noqa: E402, F401

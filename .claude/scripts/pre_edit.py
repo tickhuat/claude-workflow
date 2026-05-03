@@ -22,14 +22,8 @@ from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.config import load_config  # noqa: E402
 from lib.glob_match import matches_any  # noqa: E402
 from lib.messages import format_block  # noqa: E402
+from lib.skills import EVENT_FLAG_TO_SKILL  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
-
-
-EVENT_FLAG_TO_SKILL = {
-    "debug_required": "systematic-debugging",
-    "parallel_required": "dispatching-parallel-agents",
-    "review_required": "receiving-code-review",
-}
 
 
 def _matches_any(rel: str, globs: list[str]) -> bool:

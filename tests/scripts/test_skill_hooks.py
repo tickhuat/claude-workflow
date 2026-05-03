@@ -307,7 +307,7 @@ def test_post_skill_strips_superpowers_namespace_for_state(tmp_project):
     assert "using-superpowers" in state["skills_invoked"]
     assert "superpowers:using-superpowers" not in state["skills_invoked"]
     # Stage should advance from idle to session-started (which depends on
-    # _SKILL_TO_STAGE recognising the unprefixed name)
+    # SKILL_TO_STAGE in lib/skills.py recognising the unprefixed name)
     assert state["stage"] == "session-started"
 
 

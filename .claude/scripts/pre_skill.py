@@ -19,10 +19,8 @@ from lib.adr import index_path  # noqa: E402
 from lib.bypass import is_bypassed, log_bypass  # noqa: E402
 from lib.frontmatter import FrontmatterError, parse  # noqa: E402
 from lib.messages import format_block  # noqa: E402
+from lib.skills import GATED_SKILLS as _GATED_SKILLS  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
-
-
-_GATED_SKILLS = {"brainstorming", "writing-plans"}
 
 
 def _required_adrs(state: State) -> list[str]:
