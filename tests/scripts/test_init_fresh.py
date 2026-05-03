@@ -32,9 +32,11 @@ def test_init_fresh_removes_dogfood_keeps_engine(tmp_path):
     )
     assert r.returncode == 0, f"script failed: {r.stderr}"
 
-    # Dogfood specs/plans/ADRs gone
-    assert not list((tmp_path / "docs" / "superpowers" / "specs").glob("2026-04-*.md"))
-    assert not list((tmp_path / "docs" / "superpowers" / "plans").glob("2026-04-*.md"))
+    # Dogfood specs/plans/ADRs gone — directories should be empty of *.md
+    assert not list((tmp_path / "docs" / "superpowers" / "specs").glob("*.md")), \
+        "specs/ should be empty after init-fresh"
+    assert not list((tmp_path / "docs" / "superpowers" / "plans").glob("*.md")), \
+        "plans/ should be empty after init-fresh"
     adr_md = sorted(p.name for p in (tmp_path / "ADR").glob("*.md"))
     assert adr_md == ["0000-template.md"], f"ADR/ should only have template, got {adr_md}"
 
@@ -71,6 +73,7 @@ def test_init_fresh_removes_dev_state_and_bypass_log(tmp_path):
     # Simulate runtime artefacts present at fork time (rare but possible)
     (tmp_path / ".claude" / "dev-state.json").write_text('{"stage": "done"}')
     (tmp_path / ".claude" / "bypass.log").write_text("...\n")
+    (tmp_path / ".claude" / "bypass.log.old").write_text("rotated content\n")
 
     r = subprocess.run(
         ["bash", "scripts/init-fresh.sh"],
@@ -81,6 +84,7 @@ def test_init_fresh_removes_dev_state_and_bypass_log(tmp_path):
     assert r.returncode == 0
     assert not (tmp_path / ".claude" / "dev-state.json").exists()
     assert not (tmp_path / ".claude" / "bypass.log").exists()
+    assert not (tmp_path / ".claude" / "bypass.log.old").exists()
 
 
 def test_init_fresh_preserves_pytest_after(tmp_path):

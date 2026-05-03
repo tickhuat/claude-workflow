@@ -3,8 +3,8 @@
 #
 # WARNING: One-time use. Run this immediately after cloning the template,
 # BEFORE writing any of your own specs/plans/ADRs. It is destructive:
-# any docs/superpowers/{specs,plans}/2026-04-*.md and ADR/[1-9]*.md files
-# will be removed.
+# all docs/superpowers/{specs,plans}/*.md and ADR/*.md (except the
+# template) will be removed.
 #
 # Keeps:
 #   - .claude/scripts/, .claude/settings.json, .claude/dev-rules.config.yaml
@@ -13,11 +13,12 @@
 #   - ADR/0000-template.md (template for new ADRs)
 #
 # Removes:
-#   - docs/superpowers/specs/2026-04-*.md
-#   - docs/superpowers/plans/2026-04-*.md
+#   - docs/superpowers/specs/*.md (all dogfood specs)
+#   - docs/superpowers/plans/*.md (all dogfood plans)
 #   - ADR/*.md except 0000-template.md
 #   - .claude/dev-state.json (if present)
 #   - .claude/bypass.log (if present)
+#   - .claude/bypass.log.old (if present)
 #
 # Resets:
 #   - ADR/_index.json -> []
@@ -27,9 +28,10 @@ cd "$(dirname "$0")/.."
 
 echo "claude-workflow: stripping dogfood examples..."
 
-# Specs / plans (dogfood-only patterns)
-rm -f docs/superpowers/specs/2026-04-*.md
-rm -f docs/superpowers/plans/2026-04-*.md
+# Specs / plans — wildcard delete (these directories only hold dogfood at
+# template-fork time; the user hasn't written anything yet).
+rm -f docs/superpowers/specs/*.md
+rm -f docs/superpowers/plans/*.md
 
 # ADRs 0001 onward (keep 0000-template.md)
 for adr in ADR/*.md; do
@@ -45,6 +47,7 @@ echo '[]' > ADR/_index.json
 # Runtime state
 rm -f .claude/dev-state.json
 rm -f .claude/bypass.log
+rm -f .claude/bypass.log.old
 
 cat <<'EOF'
 

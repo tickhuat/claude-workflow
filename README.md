@@ -45,6 +45,8 @@ python3 -m pip install -e ".[dev]"
 python3 -m pytest tests/ -q
 ```
 
+The test suite covers the hook system, state machine, glob matching, ADR indexing, and concurrent migration — ~245 tests on a fresh checkout.
+
 ## Architecture
 
 ### State machine
@@ -92,7 +94,7 @@ flowchart LR
     post_bash --> state
 ```
 
-All hook scripts are Python 3 stdlib + PyYAML, sourced from `.claude/scripts/`.
+All hook scripts are Python 3 stdlib + PyYAML + pathspec, sourced from `.claude/scripts/`. `dev-state.json` reads/writes are guarded by `fcntl.flock` so concurrent hooks don't corrupt state ([ADR 0019](ADR/0019-state-file-flock.md)).
 
 ## The 5 dev rules being enforced
 
@@ -229,7 +231,7 @@ notifications in every project:
 
 ## Emergency bypass
 
-Set `DEV_RULES_BYPASS=1` to skip all hook enforcement for a single command. Each bypass is logged to `.claude/bypass.log`.
+Set `DEV_RULES_BYPASS=1` to skip all hook enforcement for a single command. Each bypass is logged to `.claude/bypass.log` (auto-rotates to `bypass.log.old` at 1 MiB; one backup kept).
 
 ## License
 
