@@ -131,7 +131,9 @@ def main() -> int:
             print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
             return 0
         s.record_skill(skill)
-        # Clear event_flag if this skill resolves it
+        # Clear event_flag if this skill resolves it.
+        # Defensive: also cleared by pre_edit warn-once and on_user_prompt reset
+        # (ADR 0017); kept here for idempotency — safe to clear an already-false flag.
         flag = SKILL_CLEARS_FLAG.get(skill)
         if flag:
             s.data["event_flags"][flag] = False

@@ -102,6 +102,8 @@ All hook scripts are Python 3 stdlib + PyYAML, sourced from `.claude/scripts/`.
 4. **Phase verification** — Each plan phase declares `target_files` (globs) and `verify_command`. `post_edit` tracks target file coverage; once all target globs are touched, stage moves to `phase-N-done`. The next Edit is blocked until a fresh Agent subagent returns `VERIFY-PASS phase=N`.
 5. **Conventional paths** — Specs in `docs/superpowers/specs/`, plans in `docs/superpowers/plans/`, ADRs in `ADR/`. Sensitive globs (`**/auth*`, `**/migrations/**`, etc.) always require a new ADR.
 
+**Event flags** (`debug_required`, `parallel_required`, `review_required`) are detected from prompt keywords by `on_user_prompt`. They emit a one-time WARN to stderr on the next `Edit` and clear themselves; they do **not** block edits (per [ADR 0017](ADR/0017-event-flag-prompt-scope.md), reverted from the original "persistent BLOCK until skill invoked" design after that proved over-aggressive in practice).
+
 ## File structure
 
 ```text

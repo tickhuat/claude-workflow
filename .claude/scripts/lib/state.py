@@ -190,12 +190,27 @@ class State:
                 "[INFO by dev-rules] state migrated v1 → v2 (skills_invoked deduped)",
                 file=sys.stderr,
             )
-            data = _migrate_v1_to_v2(data)
             try:
                 with _flocked(p, exclusive=True) as f:
+                    # Re-read under exclusive lock — another concurrent process may
+                    # have already migrated the file OR written user mutations on
+                    # top of v1 data. Migrate the LATEST disk content to avoid
+                    # clobbering concurrent writes.
                     f.seek(0)
-                    f.truncate()
-                    f.write(json.dumps(data, indent=2, ensure_ascii=False))
+                    current = f.read()
+                    try:
+                        latest = json.loads(current) if current else {}
+                    except json.JSONDecodeError:
+                        latest = {}
+                    if latest.get("schema_version") == 2:
+                        # Another process won the race; use the migrated data
+                        data = latest
+                    else:
+                        # Still v1 (or earlier); migrate latest disk state and write
+                        data = _migrate_v1_to_v2(latest if latest else data)
+                        f.seek(0)
+                        f.truncate()
+                        f.write(json.dumps(data, indent=2, ensure_ascii=False))
             except OSError as e:
                 print(
                     f"[WARN by dev-rules] could not persist v2 migration to {p}: {e}",
@@ -229,7 +244,9 @@ class State:
         return skill in self.data["skills_invoked"]
 
 
-# linear forward order; phase-N-* 由 transition 邏輯處理
+# linear forward order; phase-N-* 由 transition 邏輯處理.
+# Note: `exec-prep` retained for schema stability after ADR 0020 made
+# using-git-worktrees a noop (no transition writes into exec-prep anymore).
 _STAGE_ORDER = {s: i for i, s in enumerate([
     "idle", "session-started", "spec-ready", "plan-ready",
     "exec-prep", "exec-running", "all-phases-verified", "reviewed", "done",
