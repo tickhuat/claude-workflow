@@ -42,6 +42,12 @@ DEFAULTS: dict[str, Any] = {
     ],
     "auto_advance_phase": True,
     "commit_deviation_keyword": "Deviation:",
+    "context_pressure": {
+        "enabled": True,
+        "window_tokens": 200000,
+        "threshold_pct": 60,
+        "chars_per_token": 3.5,
+    },
 }
 
 

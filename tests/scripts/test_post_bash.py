@@ -154,3 +154,46 @@ def test_exit_code_none_skips_check(tmp_project):
     assert r.returncode == 0
     state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
     assert state.get("last_commit_violation") is None, "None exit_code must not trigger violation recording"
+
+
+def test_post_bash_sets_compact_flag_after_commit_when_over_threshold(tmp_project, monkeypatch):
+    """ADR 0023: successful git commit + high context → set compact_recommended."""
+    import site
+    # Fake transcript at 65%
+    monkeypatch.setenv("HOME", str(tmp_project))
+    encoded = "-" + str(tmp_project).replace("/", "-")
+    proj_dir = tmp_project / ".claude" / "projects" / encoded
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "s.jsonl").write_text("a" * 455_000)
+
+    # Set up minimal git repo so get_last_commit_message can read HEAD
+    _git_init_with_commit(tmp_project, "initial")
+
+    from lib.state import INITIAL_STATE
+    import copy as _copy
+    state = _copy.deepcopy(INITIAL_STATE)
+    state["stage"] = "exec-running"  # mid-phase, but after_commit=True overrides
+    (tmp_project / ".claude").mkdir(exist_ok=True)
+    (tmp_project / ".claude" / "dev-state.json").write_text(json.dumps(state))
+
+    user_site = site.getusersitepackages()
+    pythonpath = user_site if isinstance(user_site, str) else ":".join(user_site)
+    r = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps({
+            "tool_name": "Bash",
+            "tool_input": {"command": "git commit -m \"test\""},
+            "tool_response": {"exit_code": 0},
+        }),
+        capture_output=True, text=True,
+        cwd=tmp_project,
+        env={
+            "CLAUDE_PROJECT_DIR": str(tmp_project),
+            "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+            "HOME": str(tmp_project),
+            "PYTHONPATH": pythonpath,
+        },
+    )
+    assert r.returncode == 0, f"hook failed: {r.stderr}"
+    final = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert final["event_flags"]["compact_recommended"] is True
