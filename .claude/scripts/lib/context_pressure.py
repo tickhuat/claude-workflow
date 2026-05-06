@@ -84,3 +84,54 @@ def compute_pressure(window_tokens: int,
     tokens = estimate_tokens(transcript, chars_per_token)
     pct = (tokens / window_tokens) * 100.0 if window_tokens else 0.0
     return tokens, pct, transcript
+
+
+def maybe_alert_and_update_flag(s, cfg: dict, *,
+                                after_verify_pass: bool = False,
+                                after_commit: bool = False) -> bool:
+    """If over threshold + natural break + flag not yet set: alert + set flag.
+    If flag was set but pressure dropped (post-/compact): clear flag + info message.
+
+    Mutates s.data when flag changes. Returns True if mutation occurred (caller
+    should s.save()).
+
+    Per ADR 0023.
+    """
+    cp = cfg.get("context_pressure") or {}
+    if not cp.get("enabled", True):
+        return False
+    window = cp.get("window_tokens", 200000)
+    threshold = cp.get("threshold_pct", 60)
+    cpt = cp.get("chars_per_token", 3.5)
+
+    tokens, pct, transcript = compute_pressure(window, cpt)
+    if transcript is None:
+        return False
+
+    flag_set = s.data["event_flags"].get("compact_recommended", False)
+    is_over = pct >= threshold
+    natural = is_natural_break(s.data["stage"],
+                                after_verify_pass=after_verify_pass,
+                                after_commit=after_commit)
+
+    if is_over and natural and not flag_set:
+        kt = tokens // 1000
+        win_kt = window // 1000
+        print(
+            f"[INFO by dev-rules] context ~{pct:.0f}% (~{kt}K/{win_kt}K). "
+            f"Natural break detected (stage={s.data['stage']}). "
+            f"Recommend running /compact before the next major step.",
+            file=sys.stderr,
+        )
+        s.data["event_flags"]["compact_recommended"] = True
+        return True
+    if flag_set and not is_over:
+        kt = tokens // 1000
+        print(
+            f"[INFO by dev-rules] context cleared (~{pct:.0f}%, ~{kt}K). "
+            f"compact_recommended flag cleared.",
+            file=sys.stderr,
+        )
+        s.data["event_flags"]["compact_recommended"] = False
+        return True
+    return False

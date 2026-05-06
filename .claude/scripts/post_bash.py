@@ -11,6 +11,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from lib.config import load_config  # noqa: E402
+from lib.context_pressure import maybe_alert_and_update_flag  # noqa: E402
 from lib.git_utils import get_last_commit_message, is_commit_command, is_in_rebase  # noqa: E402
 from lib.state import State, StateError, project_root  # noqa: E402
 
@@ -68,6 +69,8 @@ def main() -> int:
     elif is_amend and has_keyword and s.data.get("last_commit_violation") is not None:
         # Only --amend with keyword clears a prior violation (per ADR 0005)
         s.data["last_commit_violation"] = None
+    # ADR 0023: successful commit is a natural break for context pressure.
+    maybe_alert_and_update_flag(s, cfg, after_commit=True)
     s.save()
     return 0
 

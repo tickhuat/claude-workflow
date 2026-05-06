@@ -128,3 +128,121 @@ def test_compute_pressure_at_60_percent(tmp_project, monkeypatch):
     tokens, pct, _ = compute_pressure(window_tokens=200_000, chars_per_token=3.5)
     assert tokens == 120_000
     assert abs(pct - 60.0) < 0.01
+
+
+def test_maybe_alert_sets_flag_when_over_threshold_at_natural_break(tmp_project, monkeypatch, capsys):
+    """Over threshold + natural break + flag was False → set flag, return True, print INFO."""
+    monkeypatch.setenv("HOME", str(tmp_project))
+    encoded = "-" + str(tmp_project).replace("/", "-")
+    proj_dir = tmp_project / ".claude" / "projects" / encoded
+    proj_dir.mkdir(parents=True)
+    # 130K tokens × 3.5 = 455K chars (65% of 200K)
+    (proj_dir / "session.jsonl").write_text("a" * 455_000)
+
+    from lib.state import State, INITIAL_STATE
+    import copy as _copy
+    s = State()
+    s.data = _copy.deepcopy(INITIAL_STATE)
+    s.data["stage"] = "idle"
+
+    cfg = {"context_pressure": {"enabled": True, "window_tokens": 200_000,
+                                  "threshold_pct": 60, "chars_per_token": 3.5}}
+
+    from lib.context_pressure import maybe_alert_and_update_flag
+    mutated = maybe_alert_and_update_flag(s, cfg)
+    assert mutated is True
+    assert s.data["event_flags"]["compact_recommended"] is True
+    err = capsys.readouterr().err
+    assert "context" in err.lower()
+    assert "/compact" in err
+
+
+def test_maybe_alert_no_op_when_below_threshold(tmp_project, monkeypatch, capsys):
+    """Under threshold → no alert, no mutation, return False."""
+    monkeypatch.setenv("HOME", str(tmp_project))
+    encoded = "-" + str(tmp_project).replace("/", "-")
+    proj_dir = tmp_project / ".claude" / "projects" / encoded
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "session.jsonl").write_text("a" * 100_000)  # ~28K tokens, well under
+
+    from lib.state import State, INITIAL_STATE
+    import copy as _copy
+    s = State()
+    s.data = _copy.deepcopy(INITIAL_STATE)
+    s.data["stage"] = "idle"
+    cfg = {"context_pressure": {"enabled": True, "window_tokens": 200_000,
+                                  "threshold_pct": 60, "chars_per_token": 3.5}}
+
+    from lib.context_pressure import maybe_alert_and_update_flag
+    mutated = maybe_alert_and_update_flag(s, cfg)
+    assert mutated is False
+    assert s.data["event_flags"]["compact_recommended"] is False
+    assert "context" not in capsys.readouterr().err.lower()
+
+
+def test_maybe_alert_no_op_when_mid_phase_even_if_over(tmp_project, monkeypatch, capsys):
+    """Over threshold but stage is mid-phase (exec-running) → no alert."""
+    monkeypatch.setenv("HOME", str(tmp_project))
+    encoded = "-" + str(tmp_project).replace("/", "-")
+    proj_dir = tmp_project / ".claude" / "projects" / encoded
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "session.jsonl").write_text("a" * 455_000)
+
+    from lib.state import State, INITIAL_STATE
+    import copy as _copy
+    s = State()
+    s.data = _copy.deepcopy(INITIAL_STATE)
+    s.data["stage"] = "exec-running"
+    cfg = {"context_pressure": {"enabled": True, "window_tokens": 200_000,
+                                  "threshold_pct": 60, "chars_per_token": 3.5}}
+
+    from lib.context_pressure import maybe_alert_and_update_flag
+    mutated = maybe_alert_and_update_flag(s, cfg)
+    assert mutated is False
+    assert s.data["event_flags"]["compact_recommended"] is False
+
+
+def test_maybe_alert_clears_flag_after_compact(tmp_project, monkeypatch, capsys):
+    """Flag was True but transcript dropped (post /compact) → clear flag, return True."""
+    monkeypatch.setenv("HOME", str(tmp_project))
+    encoded = "-" + str(tmp_project).replace("/", "-")
+    proj_dir = tmp_project / ".claude" / "projects" / encoded
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "session.jsonl").write_text("a" * 50_000)  # post-compact: small
+
+    from lib.state import State, INITIAL_STATE
+    import copy as _copy
+    s = State()
+    s.data = _copy.deepcopy(INITIAL_STATE)
+    s.data["stage"] = "idle"
+    s.data["event_flags"]["compact_recommended"] = True  # was set previously
+
+    cfg = {"context_pressure": {"enabled": True, "window_tokens": 200_000,
+                                  "threshold_pct": 60, "chars_per_token": 3.5}}
+
+    from lib.context_pressure import maybe_alert_and_update_flag
+    mutated = maybe_alert_and_update_flag(s, cfg)
+    assert mutated is True
+    assert s.data["event_flags"]["compact_recommended"] is False
+    assert "cleared" in capsys.readouterr().err.lower()
+
+
+def test_maybe_alert_disabled_via_config(tmp_project, monkeypatch, capsys):
+    """enabled=False → no-op even at 99% pressure."""
+    monkeypatch.setenv("HOME", str(tmp_project))
+    encoded = "-" + str(tmp_project).replace("/", "-")
+    proj_dir = tmp_project / ".claude" / "projects" / encoded
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "session.jsonl").write_text("a" * 690_000)
+
+    from lib.state import State, INITIAL_STATE
+    import copy as _copy
+    s = State()
+    s.data = _copy.deepcopy(INITIAL_STATE)
+    s.data["stage"] = "idle"
+    cfg = {"context_pressure": {"enabled": False, "window_tokens": 200_000,
+                                  "threshold_pct": 60, "chars_per_token": 3.5}}
+
+    from lib.context_pressure import maybe_alert_and_update_flag
+    mutated = maybe_alert_and_update_flag(s, cfg)
+    assert mutated is False
