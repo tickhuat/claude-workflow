@@ -26,12 +26,18 @@ Claude Code 預設只在 context 接近 100% 時才自動 compact —— 這是 
 
 新增一套 context pressure detection 機制：
 
-1. **新 lib `lib/context_pressure.py`** —— pure helper，無 state mutation：
+1. **新 lib `lib/context_pressure.py`** —— pure helpers + 1 mutator helper：
    ```python
    def find_transcript() -> Path | None
-   def estimate_tokens(transcript_path: Path) -> int
-   def compute_pressure(state, cfg) -> tuple[float, bool]   # (pct, is_over_threshold)
-   def is_natural_break(stage: str) -> bool
+   def estimate_tokens(transcript_path: Path, chars_per_token: float = 3.5) -> int
+   def is_natural_break(stage: str, *, after_verify_pass: bool = False,
+                        after_commit: bool = False) -> bool
+   def compute_pressure(window_tokens: int,
+                        chars_per_token: float = 3.5
+                        ) -> tuple[int, float, Path | None]   # (tokens, pct, transcript)
+   def maybe_alert_and_update_flag(s, cfg: dict, *,
+                                    after_verify_pass: bool = False,
+                                    after_commit: bool = False) -> bool
    ```
 
 2. **Token 估算法（char count / chars_per_token）**：

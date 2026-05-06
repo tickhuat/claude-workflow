@@ -24,6 +24,19 @@ def find_transcript() -> Path | None:
 
     Pattern: ~/.claude/projects/<dash-encoded-cwd>/<session-uuid>.jsonl
     Returns the most-recently-modified .jsonl in that dir, or None on miss.
+
+    Glob is non-recursive so Agent sub-session transcripts under
+    `<session>/subagents/` are correctly excluded — they live at depth 2
+    of the encoded dir, not at depth 1.
+
+    Limitation: if the user has multiple historical Claude Code sessions
+    rooted at the same cwd, all their .jsonl files coexist at depth 1.
+    "Newest mtime" is the active session 99% of the time (the active one
+    is being continuously written to), but during a brief window after
+    closing a session and starting a new one, an old transcript could
+    win the mtime race. Acceptable: result is always SOME transcript at
+    the right project root, just possibly not the latest turn's. Tie-
+    break by name on equal mtime to avoid filesystem-resolution flakes.
     """
     cwd = str(project_root())
     encoded = "-" + cwd.replace("/", "-")  # /Users/foo/bar → -Users-foo-bar
@@ -33,7 +46,7 @@ def find_transcript() -> Path | None:
     candidates = list(proj_dir.glob("*.jsonl"))
     if not candidates:
         return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+    return max(candidates, key=lambda p: (p.stat().st_mtime, p.name))
 
 
 def estimate_tokens(transcript_path: Path, chars_per_token: float = 3.5) -> int:
