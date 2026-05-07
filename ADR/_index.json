@@ -152,5 +152,19 @@
     "status": "Accepted",
     "file": "0022-notify-sh-cross-platform.md",
     "summary": "讓 `notify.sh` 自動偵測平台，呼叫對應的工具："
+  },
+  {
+    "id": "0023",
+    "title": "Context pressure detection — suggest /compact at natural breaks above threshold",
+    "status": "Superseded",
+    "file": "0023-context-pressure-detection.md",
+    "summary": "新增一套 context pressure detection 機制："
+  },
+  {
+    "id": "0024",
+    "title": "Defer context pressure detection — filesystem-based approach not viable",
+    "status": "Accepted",
+    "file": "0024-context-pressure-detection-deferred.md",
+    "summary": "1."
   }
 ]
