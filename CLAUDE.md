@@ -18,7 +18,7 @@ This repo enforces a structured development flow via Claude Code hooks. Spec: `d
 **Constraints:**
 - Spec/plan frontmatter MUST list `adrs:` referencing existing ADR slugs
 - Each phase declares `target_files` (globs) and `verify_command`
-- Files outside target_files but in whitelist (`*.md`, `docs/**`, `tests/**`, `.claude/**`, `ADR/**`, `*.json`, `*.css`) pass through
+- Files outside target_files but in `global_whitelist` (e.g. `*.md`, `docs/**`, `tests/**`, `.claude/**`, `ADR/**`, `*.json`, `*.css` — see `.claude/dev-rules.config.yaml` for the full list) pass through
 - Sensitive paths (`auth*`, `schema*`, `migrations/**`, `*.config.*`) outside target_files always require new ADR
 - Deviation 1-2 unique extra files: warn + commit message must contain `Deviation: <reason>`
 - Deviation ≥3: blocked until new ADR added

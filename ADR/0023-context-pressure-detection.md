@@ -3,8 +3,7 @@ id: "0023"
 title: Context pressure detection — suggest /compact at natural breaks above threshold
 status: Superseded
 date: 2026-05-04
-related_specs:
-  - docs/superpowers/specs/2026-05-04-context-pressure-design.md
+related_specs: []  # original spec deleted in PR #6 along with the implementation
 related_plans: []
 supersedes: null
 superseded_by: 0024-context-pressure-detection-deferred
