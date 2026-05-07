@@ -92,14 +92,3 @@ def test_defaults_match_shipped_yaml():
             f"  shipped: {value!r}\n"
             f"  DEFAULTS: {DEFAULTS[key]!r}"
         )
-
-
-def test_context_pressure_defaults_synced(tmp_project):
-    """ADR 0023: context_pressure config block has expected shape and defaults."""
-    from lib.config import DEFAULTS
-    cp = DEFAULTS.get("context_pressure")
-    assert isinstance(cp, dict), "context_pressure must be a nested dict"
-    assert cp.get("enabled") is True
-    assert cp.get("window_tokens") == 200000
-    assert cp.get("threshold_pct") == 60
-    assert cp.get("chars_per_token") == 3.5

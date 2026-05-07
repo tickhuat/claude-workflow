@@ -64,26 +64,15 @@ def main() -> int:
         print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
         _print_adr_index()
         return 0
-    # ADR 0023 exception: compact_recommended is a session-level state flag
-    # (tracks context pressure, cleared only when /compact happens), NOT a
-    # per-prompt flag. Exclude it from the prompt-scope reset (per ADR 0017
-    # which scopes the OTHER three flags). Listing flags explicitly so adding
-    # a new prompt-scope flag in the future is a deliberate edit here.
-    PROMPT_SCOPE_FLAGS = ("debug_required", "parallel_required", "review_required")
-
+    # Optimization: skip the save() if no detection AND no flags are set.
+    # Most prompts don't contain keywords; this is the hot path.
     current = s.data["event_flags"]
-
-    # Optimization: skip the save() if no detection AND no prompt-scope flags
-    # are currently set. compact_recommended is intentionally NOT considered
-    # "dirty state" for this fast-path (resetting it isn't our job).
-    prompt_scope_dirty = any(current.get(f, False) for f in PROMPT_SCOPE_FLAGS)
-    if not flags and not prompt_scope_dirty:
+    if not flags and not any(current.values()):
         _print_adr_index()
         return 0
-    # Reset only prompt-scope flags
-    for known_flag in PROMPT_SCOPE_FLAGS:
-        if known_flag in current:
-            current[known_flag] = False
+    # Reset all known flags to false
+    for known_flag in current:
+        current[known_flag] = False
     # Then set newly-detected flags to true
     for k, v in flags.items():
         current[k] = v
