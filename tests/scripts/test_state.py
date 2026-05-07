@@ -510,31 +510,3 @@ def test_concurrent_v2_migration_only_one_info(tmp_project):
         f"expected exactly 1 v2 migration INFO across both loaders; "
         f"got {info_count}.\nstderr 1: {r1.stderr!r}\nstderr 2: {r2.stderr!r}"
     )
-
-
-def test_initial_state_has_compact_recommended_flag(tmp_project):
-    """ADR 0023: INITIAL_STATE.event_flags includes compact_recommended=False."""
-    from lib.state import INITIAL_STATE
-    flags = INITIAL_STATE["event_flags"]
-    assert "compact_recommended" in flags
-    assert flags["compact_recommended"] is False
-
-
-def test_load_forward_compat_compact_recommended(tmp_project):
-    """Older state file without compact_recommended → load fills in default False."""
-    import json as _json
-    path = tmp_project / ".claude" / "dev-state.json"
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(_json.dumps({
-        "schema_version": 2,
-        "stage": "idle",
-        "event_flags": {
-            "debug_required": False,
-            "parallel_required": False,
-            "review_required": False,
-        },
-    }))
-    s = State.load()
-    assert s.data["event_flags"]["compact_recommended"] is False
-    # Other flags preserved
-    assert s.data["event_flags"]["debug_required"] is False

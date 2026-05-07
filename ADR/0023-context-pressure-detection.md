@@ -1,13 +1,21 @@
 ---
 id: "0023"
 title: Context pressure detection — suggest /compact at natural breaks above threshold
-status: Accepted
+status: Superseded
 date: 2026-05-04
 related_specs:
   - docs/superpowers/specs/2026-05-04-context-pressure-design.md
 related_plans: []
 supersedes: null
+superseded_by: 0024-context-pressure-detection-deferred
 ---
+
+> **Status: Superseded by [ADR 0024](0024-context-pressure-detection-deferred.md).**
+> Implementation merged in PR #5 (commit 7a8e631) and reverted in PR #6 (commit
+> 8c4b7f5) after dogfood revealed the filesystem-based estimation approach
+> cannot reliably mirror Claude's actual context window state. See ADR 0024 for
+> failure analysis and trigger conditions to revisit. ADR is preserved for
+> historical traceability per the append-only ADR principle.
 
 ## Context
 
@@ -59,57 +67,29 @@ Claude Code 預設只在 context 接近 100% 時才自動 compact —— 這是 
      threshold_pct: 60          # over this → recommend compact
      chars_per_token: 3.5       # estimation factor
    ```
-   - DEFAULTS in `lib/config.py` 同步 yaml（per ADR 0015）
-   - 新 test `test_config_context_pressure_defaults_synced`
 
 5. **State schema 加 flag**（不需要 schema_version v3）：
    - `INITIAL_STATE.event_flags.compact_recommended: False`
-   - 既有 v2 state file 載入時，`State.load()` 的 `merged["event_flags"] = {**INITIAL_STATE["event_flags"], **(data.get("event_flags") or {})}` 會自動補 default `False`
-   - 向前相容、無 migration
+   - 既有 v2 state file 載入時，merge 自動補 default `False`
 
-6. **Hook 整合 — post_skill + post_bash**：
-   - 在「自然斷點」事件後 call `compute_pressure()`
-   - 若 `is_over_threshold=True` AND `event_flags.compact_recommended` 仍為 False：
-     - 印 stderr `[INFO by dev-rules] context ~62% (~125K/200K). Natural break detected (stage=phase-2-verified). Recommend /compact before next major step.`
-     - 設 `s.data["event_flags"]["compact_recommended"] = True` + save
-   - 若 flag 已是 True → 不重複印（warn-once）
+6. **Hook 整合 — post_skill + post_bash** —— 自然斷點時 call helper
 
-7. **自然斷點定義**：
-   - ✅ stage in (`idle`, `phase-N-verified`, `all-phases-verified`, `reviewed`, `done`)
-   - ✅ post_bash 偵測到 git commit 成功
-   - ✅ post_skill 偵測到 Agent VERIFY-PASS
-   - ❌ stage in (`exec-running` mid-phase, `phase-N-done` 未 verify)
-   - 不算的情況下 hook 仍計算 pressure，但**不**設 flag、不印 stderr
+7. **特例：on_user_prompt 不 reset `compact_recommended`** —— ADR 0017 例外
 
-8. **特例：on_user_prompt 不 reset `compact_recommended`**：
-   - ADR 0017 規定 `event_flags` 每個 prompt 開頭 reset 為 false
-   - 但 `compact_recommended` 是「context 量級」的狀態，**跨 prompt 仍有效**直到 user 真的 /compact
-   - on_user_prompt.py 改成 reset 「除了 compact_recommended 之外」的 flags
-   - 加註解明確標示為 ADR 0017 的例外，連結到本 ADR
+8. **Claude 行為層 nudge（CLAUDE.md）**
 
-9. **Flag 何時清**：
-   - User 跑 `/compact` 後，transcript size 大幅縮減（compact summary 取代原 transcript）
-   - 下次 hook fire 時 `compute_pressure()` 看到 pct 已掉回 threshold 以下
-   - hook 偵測「flag is True but pressure dropped」→ 清 flag + 印 `[INFO] context cleared (~25%)`，避免 stale
+## Consequences (assessed at original Accepted time)
 
-10. **Claude 行為層 nudge（CLAUDE.md）**：
-    - `## LLM behavior` 加一條：「If `event_flags.compact_recommended` is true, tell user 'context is at ~X%, recommend /compact before continuing.' Don't run further heavy work in this turn.」
+- Positive: 提前 compact 提示、state flag + stderr 雙管、零依賴
+- Negative: char count 對 image-heavy 偏低、Windows 不支援、ADR 0017 局部不一致
+- Follow-up: 若估算誤差太大可加 hybrid mode、status line 顯示 % 是 future work
 
-## Consequences
+## Why this was superseded
 
-- **Positive:**
-  - 提前 compact 提示，減少 100% 卡死 → 自動 compact 的 jarring 體驗
-  - state flag + stderr 雙管，user 跟 Claude 都不會錯過
-  - 自然斷點偵測利用既有 state machine，無需新 stage
-  - char count 估算零依賴、跑得快（< 5ms hook overhead）
-  - config 可關（`enabled: false`），對 init-fresh template user 友善
+See [ADR 0024](0024-context-pressure-detection-deferred.md) for full analysis. Summary:
 
-- **Negative:**
-  - char count 對 image-heavy session 偏低（~1.5K tokens / image 看不到）→ user 可能晚點才看到警告 → mitigation: threshold 設 60%（其實是粗估的 60%，留 20% margin）
-  - Cross-platform（Windows）`~/.claude/projects/` 路徑可能不同 —— 但 ADR 0019 已記錄 repo 假設 POSIX 環境，本 ADR 跟隨
-  - on_user_prompt 對單一 flag 例外處理 = 跟 ADR 0017 局部不一致 → mitigation: code comment + link 本 ADR
-
-- **Follow-up:**
-  - 若估算誤差太大，可加 hybrid mode（每 N 次 hook 用 Anthropic API `messages.count_tokens` 校準一次）
-  - status line 顯示 context % 是 future work（本 ADR 不含）
-  - Windows 支援需另一個 ADR
+1. **Encoding bug** in `find_transcript` (was `"-" + cwd.replace("/", "-")` — `cwd` already starts with `/`, double-prefixed). Tests had a mirror-image bug so all 268 tests passed despite the hook never firing in production.
+2. **char count / 3.5 over-estimates by ~22x** in real usage because transcript JSONL stores verbatim tool outputs, system-reminder injections, and JSON syntax overhead — but Claude's actual context window only loads a subset.
+3. **`/compact` doesn't shrink the transcript file** (append-only). The flag-clear branch is unreachable because file size never drops post-compact.
+4. **Cross-session / `claude --continue` resumes** would also break the assumption that file size ≈ context window load.
+5. The hook system has no event payload exposing Claude's actual context window state, so any filesystem-based estimation is a proxy that fails to mirror reality.

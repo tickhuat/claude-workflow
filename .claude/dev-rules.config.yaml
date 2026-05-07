@@ -50,13 +50,3 @@ auto_advance_phase: true
 
 # commit message 必須含的偏離標記（pre_bash + post_bash 都用這條）
 commit_deviation_keyword: "Deviation:"
-
-# Context window pressure — when transcript reaches threshold_pct of window_tokens
-# and we're at a natural break (stage=verified/done/idle, after commit, after
-# VERIFY-PASS), emit stderr [INFO] + set state.event_flags.compact_recommended
-# (per ADR 0023). Set enabled=false to disable the feature entirely.
-context_pressure:
-  enabled: true
-  window_tokens: 200000
-  threshold_pct: 60
-  chars_per_token: 3.5

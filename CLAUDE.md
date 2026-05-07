@@ -10,7 +10,10 @@ This repo enforces a structured development flow via Claude Code hooks. Spec: `d
 3. `Skill(writing-plans)` → produces plan at `docs/superpowers/plans/`
 4. `Skill(executing-plans)` or `subagent-driven-development` → enters exec-running
 5. Per phase: write tests first (TDD), implement, verify via fresh `Agent` subagent ending with `VERIFY-PASS phase=N`
-6. `Skill(requesting-code-review)` → `Skill(finishing-a-development-branch)` → done
+6. `Skill(requesting-code-review)` — per-PR feedback from a fresh subagent
+7. **Cascade audit** — dispatch a `general-purpose` Agent to look at the FINAL codebase state (not just diff) for "changed-A-broke-B" cross-cutting issues. Catches bugs the per-PR review misses (e.g., glob semantics shift shadowing sensitive paths, regex changes affecting unrelated callers).
+8. **Live verification** — when the feature interacts with Claude Code runtime state (hooks, `.claude/dev-state.json`, transcript JSONL under `~/.claude/projects/`, anything in `.claude/scripts/`), run it end-to-end in a real session and inspect actual state (e.g., `cat .claude/dev-state.json`). Code review + cascade audit inspect source — they don't see runtime divergence. See [ADR 0024](ADR/0024-context-pressure-detection-deferred.md) lesson #3 for the failure mode this prevents.
+9. `Skill(finishing-a-development-branch)` → done
 
 **Constraints:**
 - Spec/plan frontmatter MUST list `adrs:` referencing existing ADR slugs
@@ -32,4 +35,3 @@ The hook system enforces structure (which files, which order). These rules cover
 
 - **Surface ambiguity, don't silently pick.** If the request has multiple plausible interpretations, present them as α/β/γ options before implementing. Push back with technical reasoning when a request seems wrong — don't agree performatively.
 - **Stay surgical inside target_files.** The hooks gate which files you may touch; they do NOT gate what you do once inside. Don't reformat unrelated code, "improve" adjacent comments, or refactor working code that the task didn't ask about. Every changed line should trace to the current task or plan step.
-- **Compact when recommended.** When `state.event_flags.compact_recommended` is true (visible via stderr `[INFO]` from a hook, or `cat .claude/dev-state.json | jq .event_flags`), tell the user "context is high — recommend running /compact before continuing." Don't run further heavy work in the same turn after seeing the recommendation. The exact percentage may not be reliably available across turns; the boolean is the source of truth. Per [ADR 0023](ADR/0023-context-pressure-detection.md).

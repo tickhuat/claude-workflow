@@ -87,7 +87,6 @@ INITIAL_STATE: dict[str, Any] = {
         "debug_required": False,
         "parallel_required": False,
         "review_required": False,
-        "compact_recommended": False,  # ADR 0023: tracks context pressure (NOT prompt-scoped)
     },
     "last_transition": None,
 }

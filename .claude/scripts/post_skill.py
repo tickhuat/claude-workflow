@@ -19,8 +19,6 @@ sys.path.insert(0, str(HERE))
 from lib.frontmatter import parse, FrontmatterError  # noqa: E402
 from lib.skills import SKILL_CLEARS_FLAG  # noqa: E402
 from lib.state import State, StateError, next_stage_after_skill, project_root  # noqa: E402
-from lib.config import load_config  # noqa: E402
-from lib.context_pressure import maybe_alert_and_update_flag  # noqa: E402
 
 
 def _newest(globs: list[str]) -> Path | None:
@@ -140,8 +138,6 @@ def main() -> int:
         if flag:
             s.data["event_flags"][flag] = False
         _try_transition(s, skill)
-        # ADR 0023: detect context pressure at this natural break.
-        maybe_alert_and_update_flag(s, load_config())
         s.save()
     elif tool_name == "Agent":
         text = _extract_agent_text(event.get("tool_response") or {})
@@ -164,6 +160,7 @@ def main() -> int:
                 if all_done:
                     s.set_stage("all-phases-verified")
                 else:
+                    from lib.config import load_config
                     if load_config().get("auto_advance_phase", True):
                         # Defensive: only advance if n matches current_phase (avoid stale-state jumps)
                         if n != s.data.get("current_phase"):
@@ -184,8 +181,6 @@ def main() -> int:
                         else:
                             s.set_stage("exec-running")
                             s.data["current_phase"] = n + 1
-            # ADR 0023: VERIFY-PASS is a strong natural break signal.
-            maybe_alert_and_update_flag(s, load_config(), after_verify_pass=True)
             s.save()
         elif m_fail:
             n, reason = m_fail.group(1), m_fail.group(2).strip()
