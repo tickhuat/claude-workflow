@@ -2,7 +2,9 @@
 
 ## Dev Rules Enforcement
 
-This repo enforces a structured development flow via Claude Code hooks. Spec: `docs/superpowers/specs/2026-04-29-dev-rules-enforcement-design.md`. ADRs in `ADR/`.
+This repo enforces a structured development flow via Claude Code hooks. Spec: `docs/superpowers/specs/2026-04-29-dev-rules-enforcement-design.md`.
+
+**Doctrine vs. ADR**: framework rules live in [docs/doctrine/](docs/doctrine/) (current state, edited in place). [ADR/](ADR/) records change events at point-in-time. Both are kept in sync; new framework changes write an ADR and update the relevant doctrine doc.
 
 **Workflow:**
 1. `Skill(using-superpowers)` (every session)
