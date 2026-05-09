@@ -164,4 +164,27 @@ def test_current_mode_config_uses_in_code_fallback_when_yaml_missing_feature(tmp
     s = State()
     s.data["mode"] = "feature"
     mc = current_mode_config(s)
-    assert mc is _FALLBACK_FEATURE or mc.name == "feature"
+    # Identity check — `or mc.name == "feature"` would defang the test by also
+    # accepting any ModeConfig that happens to be named "feature", regardless
+    # of whether the in-code fallback path was actually exercised.
+    assert mc is _FALLBACK_FEATURE
+
+
+def test_fallback_feature_matches_defaults():
+    """Defence in depth: the in-code _FALLBACK_FEATURE constant must agree
+    with DEFAULTS["modes"]["feature"]. ADR 0015's existing consistency test
+    enforces YAML ↔ DEFAULTS; this one extends the chain to _FALLBACK_FEATURE
+    so a future YAML/DEFAULTS update that forgets the constant fails loudly.
+    """
+    from claude_workflow.lib.modes import _FALLBACK_FEATURE
+    from claude_workflow.lib.config import DEFAULTS
+    d = DEFAULTS["modes"]["feature"]
+    assert list(_FALLBACK_FEATURE.required_stages) == d["required_stages"]
+    for f in (
+        "require_spec",
+        "require_plan",
+        "require_phase_verify",
+        "require_review",
+        "sensitive_globs_strict",
+    ):
+        assert getattr(_FALLBACK_FEATURE, f) == d[f], f"{f} diverged"
