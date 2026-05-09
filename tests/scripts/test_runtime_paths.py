@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from lib.runtime_paths import RUNTIME_TRIGGER_GLOBS, is_runtime_touching
+from claude_workflow.lib.runtime_paths import RUNTIME_TRIGGER_GLOBS, is_runtime_touching
 
 
 class TestIsRuntimeTouching:
@@ -30,9 +30,10 @@ class TestIsRuntimeTouching:
         assert matched == []
 
     @pytest.mark.parametrize("path", [
-        ".claude/scripts/pre_skill.py",
-        ".claude/scripts/lib/state.py",
-        ".claude/scripts/post_read.py",
+        "src/claude_workflow/hooks/pre_skill.py",
+        "src/claude_workflow/lib/state.py",
+        "src/claude_workflow/hooks/post_read.py",
+        "templates/.claude/settings.json",
         ".claude/dev-state.json",
         ".claude/dev-rules.config.yaml",
         ".claude/dev-rules.config.local.yaml",
@@ -47,17 +48,17 @@ class TestIsRuntimeTouching:
     def test_mixed_diff_returns_true_with_only_runtime_in_matched(self) -> None:
         files = [
             "README.md",
-            ".claude/scripts/pre_skill.py",
+            "src/claude_workflow/hooks/pre_skill.py",
             "docs/foo.md",
             ".claude/dev-state.json",
         ]
         applies, matched = is_runtime_touching(files)
         assert applies is True
-        assert set(matched) == {".claude/scripts/pre_skill.py", ".claude/dev-state.json"}
+        assert set(matched) == {"src/claude_workflow/hooks/pre_skill.py", ".claude/dev-state.json"}
 
-    def test_nested_path_under_scripts_lib_matches(self) -> None:
-        # glob is .claude/scripts/** — must match arbitrary depth
-        files = [".claude/scripts/lib/runtime_paths.py"]
+    def test_nested_path_under_package_matches(self) -> None:
+        # glob is src/claude_workflow/** — must match arbitrary depth
+        files = ["src/claude_workflow/lib/runtime_paths.py"]
         applies, matched = is_runtime_touching(files)
         assert applies is True
 
@@ -70,7 +71,8 @@ class TestIsRuntimeTouching:
         """
         assert isinstance(RUNTIME_TRIGGER_GLOBS, tuple)
         required = {
-            ".claude/scripts/**",
+            "src/claude_workflow/**",
+            "templates/.claude/**",
             ".claude/dev-state.json",
             ".claude/dev-rules.config.yaml",
             ".claude/dev-rules.config.local.yaml",

@@ -5,13 +5,13 @@ from pathlib import Path
 
 
 
-PRE = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "pre_skill.py"
-POST = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "post_skill.py"
+PRE = "claude_workflow.hooks.pre_skill"
+POST = "claude_workflow.hooks.post_skill"
 
 
-def run(hook: Path, event: dict, cwd: Path):
+def run(hook: str, event: dict, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(hook)],
+        [sys.executable, "-m", hook],
         input=json.dumps(event),
         capture_output=True,
         text=True,
@@ -106,7 +106,7 @@ def test_pre_skill_blocks_when_spec_adrs_not_all_read(tmp_project):
     spec.write_text("---\ntitle: Foo\nadrs: [0001-x, 0002-y]\n---\nbody")
     sp = tmp_project / ".claude" / "dev-state.json"
     sp.parent.mkdir(exist_ok=True)
-    from lib.state import INITIAL_STATE
+    from claude_workflow.lib.state import INITIAL_STATE
     import copy as _copy
     full = _copy.deepcopy(INITIAL_STATE)
     full["current_spec"] = "docs/superpowers/specs/2026-04-29-foo.md"
@@ -124,7 +124,7 @@ def test_pre_skill_passes_when_all_spec_adrs_read(tmp_project):
     spec.write_text("---\ntitle: Foo\nadrs: [0001-x, 0002-y]\n---\nbody")
     sp = tmp_project / ".claude" / "dev-state.json"
     sp.parent.mkdir(exist_ok=True)
-    from lib.state import INITIAL_STATE
+    from claude_workflow.lib.state import INITIAL_STATE
     import copy as _copy
     full = _copy.deepcopy(INITIAL_STATE)
     full["current_spec"] = "docs/superpowers/specs/2026-04-29-foo.md"
@@ -207,7 +207,7 @@ def test_post_skill_records_verify_fail(tmp_project, set_stage):
 def test_systematic_debugging_clears_flag(tmp_project):
     sp = tmp_project / ".claude" / "dev-state.json"
     sp.parent.mkdir(exist_ok=True)
-    from lib.state import INITIAL_STATE
+    from claude_workflow.lib.state import INITIAL_STATE
     import copy as _copy
     full = _copy.deepcopy(INITIAL_STATE)
     full["event_flags"]["debug_required"] = True
@@ -327,7 +327,7 @@ def test_pre_skill_strips_namespace_for_gated_check(tmp_project):
     spec.write_text("---\ntitle: X\nadrs: [0001-x]\n---\nbody")
     sp = tmp_project / ".claude" / "dev-state.json"
     sp.parent.mkdir(exist_ok=True)
-    from lib.state import INITIAL_STATE
+    from claude_workflow.lib.state import INITIAL_STATE
     import copy as _copy
     full = _copy.deepcopy(INITIAL_STATE)
     full["current_spec"] = "docs/superpowers/specs/2026-04-29-x.md"

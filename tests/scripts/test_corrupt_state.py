@@ -4,12 +4,9 @@ import sys
 from pathlib import Path
 
 
-SCRIPTS = Path(__file__).resolve().parents[2] / ".claude" / "scripts"
-
-
 def fire(hook_name: str, event: dict, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(SCRIPTS / f"{hook_name}.py")],
+        [sys.executable, "-m", f"claude_workflow.hooks.{hook_name}"],
         input=json.dumps(event),
         capture_output=True,
         text=True,

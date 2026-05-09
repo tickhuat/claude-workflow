@@ -5,12 +5,9 @@ import sys
 from pathlib import Path
 
 
-HOOK = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "post_read.py"
-
-
 def run_post_read(file_path: str, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.post_read"],
         input=json.dumps({
             "tool_name": "Read",
             "tool_input": {"file_path": file_path},
@@ -103,7 +100,7 @@ def test_records_adr_read_from_worktree(tmp_path):
 
     # CLAUDE_PROJECT_DIR points to the worktree (typical worktree usage)
     r = subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.post_read"],
         input=json.dumps({"tool_name": "Read", "tool_input": {"file_path": str(adr_in_wt)}}),
         capture_output=True, text=True,
         cwd=wt,
@@ -140,7 +137,7 @@ def test_records_adr_read_via_main_repo_path_from_worktree(tmp_path):
     assert adr_in_main.exists()
 
     r = subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.post_read"],
         input=json.dumps({"tool_name": "Read", "tool_input": {"file_path": str(adr_in_main)}}),
         capture_output=True, text=True,
         cwd=wt,

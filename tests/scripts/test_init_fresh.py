@@ -10,7 +10,7 @@ SCRIPT = PROJECT_ROOT / "scripts" / "init-fresh.sh"
 def _seed_repo(dst: Path):
     """Copy enough of the project tree into dst to simulate a fresh fork."""
     for sub in (".claude", "ADR", "docs/superpowers/specs",
-                "docs/superpowers/plans", "tests", "scripts"):
+                "docs/superpowers/plans", "tests", "scripts", "src"):
         src = PROJECT_ROOT / sub
         if src.exists():
             shutil.copytree(src, dst / sub, dirs_exist_ok=True)
@@ -88,9 +88,18 @@ def test_init_fresh_removes_dev_state_and_bypass_log(tmp_path):
 
 
 def test_init_fresh_preserves_pytest_after(tmp_path):
-    """After init-fresh, pytest in the cleaned repo still works (engine intact)."""
+    """After init-fresh, pytest in the cleaned repo still works (engine intact).
+
+    Per ADR 0030: the package lives in src/claude_workflow/. After init-fresh,
+    the cleaned tree still has pyproject.toml + src/, so PYTHONPATH=src lets
+    `import claude_workflow` work without a full `pip install -e .` step in
+    the inner subprocess.
+    """
+    import os
     _seed_repo(tmp_path)
     subprocess.run(["bash", "scripts/init-fresh.sh"], cwd=tmp_path, check=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(tmp_path / "src")
     r = subprocess.run(
         [
             "python3", "-m", "pytest", "tests/", "-q", "--no-header", "-x",
@@ -99,6 +108,7 @@ def test_init_fresh_preserves_pytest_after(tmp_path):
         cwd=tmp_path,
         capture_output=True,
         text=True,
+        env=env,
     )
     # Exclude test_init_fresh.py from inner run to prevent recursive spawning.
     # Key check: lib imports work, no collection errors.

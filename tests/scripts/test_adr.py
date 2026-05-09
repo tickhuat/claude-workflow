@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.adr import rebuild_index, ADRError
+from claude_workflow.lib.adr import rebuild_index, ADRError
 
 
 def write_adr(root: Path, slug: str, fm: dict, decision: str = "...") -> Path:

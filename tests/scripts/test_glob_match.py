@@ -1,5 +1,5 @@
 """Glob matching uses .gitignore wildmatch semantics via pathspec (ADR 0014)."""
-from lib.glob_match import matches, matches_any
+from claude_workflow.lib.glob_match import matches, matches_any
 
 
 def test_double_star_matches_nested():

@@ -3,11 +3,10 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / ".claude" / "scripts"))
 
 
 def test_load_returns_defaults_when_no_config(tmp_project):
-    from lib.config import load_config
+    from claude_workflow.lib.config import load_config
     cfg = load_config()
     # Default fields all present
     assert "sensitive_globs" in cfg
@@ -18,7 +17,7 @@ def test_load_returns_defaults_when_no_config(tmp_project):
 
 
 def test_load_overrides_from_main_config(tmp_project):
-    from lib.config import load_config
+    from claude_workflow.lib.config import load_config
     cfg_file = tmp_project / ".claude" / "dev-rules.config.yaml"
     cfg_file.write_text(
         "sensitive_globs:\n"
@@ -33,7 +32,7 @@ def test_load_overrides_from_main_config(tmp_project):
 
 
 def test_local_config_overrides_main(tmp_project):
-    from lib.config import load_config
+    from claude_workflow.lib.config import load_config
     (tmp_project / ".claude" / "dev-rules.config.yaml").write_text(
         "commit_deviation_keyword: 'Deviation:'\n"
     )
@@ -45,7 +44,7 @@ def test_local_config_overrides_main(tmp_project):
 
 
 def test_partial_override_keeps_default_keys(tmp_project):
-    from lib.config import load_config
+    from claude_workflow.lib.config import load_config
     (tmp_project / ".claude" / "dev-rules.config.yaml").write_text(
         "auto_advance_phase: false\n"
     )
@@ -57,7 +56,7 @@ def test_partial_override_keeps_default_keys(tmp_project):
 
 
 def test_corrupt_yaml_falls_back_to_defaults(tmp_project, capsys):
-    from lib.config import load_config
+    from claude_workflow.lib.config import load_config
     (tmp_project / ".claude" / "dev-rules.config.yaml").write_text(
         "sensitive_globs: [unclosed\n"
     )
@@ -81,9 +80,9 @@ def test_defaults_match_shipped_yaml():
     import importlib
     import sys
     sys.path.insert(0, str(repo_root / ".claude" / "scripts"))
-    from lib import config as config_module
+    from claude_workflow.lib import config as config_module
     importlib.reload(config_module)
-    from lib.config import DEFAULTS
+    from claude_workflow.lib.config import DEFAULTS
 
     for key, value in shipped.items():
         assert key in DEFAULTS, f"DEFAULTS missing key {key!r} from shipped yaml"

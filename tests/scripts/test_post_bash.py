@@ -5,9 +5,6 @@ import sys
 from pathlib import Path
 
 
-HOOK = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "post_bash.py"
-
-
 def _git_init_with_commit(d: Path, msg: str):
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=d, check=True)
     subprocess.run(["git", "config", "user.email", "t@t"], cwd=d, check=True)
@@ -18,7 +15,7 @@ def _git_init_with_commit(d: Path, msg: str):
 
 
 def _set_state(d: Path, **kw):
-    from lib.state import INITIAL_STATE
+    from claude_workflow.lib.state import INITIAL_STATE
     import copy as _copy
     full = _copy.deepcopy(INITIAL_STATE)
     full.update(kw)
@@ -29,7 +26,7 @@ def _set_state(d: Path, **kw):
 
 def run_post_bash(cmd: str, cwd: Path, exit_code: int = 0):
     return subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.post_bash"],
         input=json.dumps({
             "tool_name": "Bash",
             "tool_input": {"command": cmd},
@@ -141,7 +138,7 @@ def test_exit_code_none_skips_check(tmp_project):
                deviation_log=[{"phase": 1, "file": "src/x.py"}])
     # tool_response without exit_code
     r = subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.post_bash"],
         input=json.dumps({
             "tool_name": "Bash",
             "tool_input": {"command": "git commit -m 'feat: foo'"},

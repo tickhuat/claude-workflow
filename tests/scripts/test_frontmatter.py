@@ -1,7 +1,7 @@
 import datetime as _dt
 import pytest
 
-from lib.frontmatter import parse, dump, FrontmatterError
+from claude_workflow.lib.frontmatter import parse, dump, FrontmatterError
 
 
 def test_parse_simple_kv():

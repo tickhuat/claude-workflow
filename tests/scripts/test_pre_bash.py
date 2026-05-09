@@ -4,12 +4,9 @@ import sys
 from pathlib import Path
 
 
-HOOK = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "pre_bash.py"
-
-
 def run_pre_bash(cmd: str, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.pre_bash"],
         input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
         capture_output=True,
         text=True,
@@ -21,7 +18,7 @@ def run_pre_bash(cmd: str, cwd: Path):
 def set_state(tmp_project, **kw):
     p = tmp_project / ".claude" / "dev-state.json"
     p.parent.mkdir(exist_ok=True)
-    from lib.state import INITIAL_STATE
+    from claude_workflow.lib.state import INITIAL_STATE
     import copy as _copy
     full = _copy.deepcopy(INITIAL_STATE)
     full.update(kw)
