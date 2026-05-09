@@ -233,6 +233,21 @@ notifications in every project:
 
 Set `DEV_RULES_BYPASS=1` to skip all hook enforcement for a single command. Each bypass is logged to `.claude/bypass.log` (auto-rotates to `bypass.log.old` at 1 MiB; one backup kept).
 
+## Maintenance notes
+
+### When adding new Claude Code runtime state
+
+When you introduce new files / paths that affect Claude Code's runtime
+behavior (new hook types, new state files, new transcript-touching code),
+update **both**:
+
+- `.claude/scripts/lib/runtime_paths.py` — add the path glob to `RUNTIME_TRIGGER_GLOBS`
+- `tests/scripts/test_runtime_paths.py` — add a test case under `test_runtime_path_returns_true`
+
+Why: the `live-verification` skill uses this list to decide whether a PR
+needs end-to-end verification before merge. Stale list → silent
+false-negatives (the failure mode that ADR 0024 documents).
+
 ## License
 
 [MIT](LICENSE).
