@@ -3,4 +3,4 @@
 See docs/PHILOSOPHY.md for the design north star and docs/doctrine/ for
 living framework rules.
 """
-__version__ = "0.4.0.dev0"
+__version__ = "0.4.0"
