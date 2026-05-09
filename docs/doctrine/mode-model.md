@@ -3,6 +3,8 @@ title: Mode model
 last_updated: 2026-05-09
 ---
 
+How `claude-workflow` adapts ceremony to task shape: modes (feature, bugfix, …) declared in YAML, gating behaviour driven by per-mode bool flags, mid-flow lock semantics.
+
 ## Mode concept
 
 A **mode** is a per-development-cycle workflow shape. It controls which stages the state machine must visit and which gates are active during that cycle. Different tasks call for different amounts of ceremony: writing a new feature from scratch warrants spec, plan, multi-phase verification, and code review; fixing a known one-line bug does not need a spec or a plan, but still warrants code review and ADR protection of sensitive paths.

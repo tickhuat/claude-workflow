@@ -3,6 +3,8 @@ title: Distribution and versioning
 last_updated: 2026-05-09
 ---
 
+Project identity, license, how the framework reaches users (`init-fresh.sh` scaffold today, PyPI later), and the SemVer policy that gates breaking changes.
+
 ## Identity
 
 The project is named **`claude-workflow`** — not `claude-dev-rules`, not `pjm-agent-dev-rules`, not `everyday-agent`.

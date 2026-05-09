@@ -161,3 +161,57 @@ def test_list_doctrine_empty_when_no_dir(tmp_path, monkeypatch):
     from lib.doctrine import list_doctrine
 
     assert list_doctrine() == []
+
+
+# ---- _first_paragraph heading-skip behaviour (issue #19) ----
+
+def _import_first_paragraph():
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+    from lib.doctrine import _first_paragraph
+    return _first_paragraph
+
+
+def test_first_paragraph_skips_leading_heading():
+    fp = _import_first_paragraph()
+    assert fp("## Foo\n\nBody text.") == "Body text."
+
+
+def test_first_paragraph_skips_multiple_headings():
+    fp = _import_first_paragraph()
+    assert fp("## Foo\n\n### Bar\n\nReal body here.") == "Real body here."
+
+
+def test_first_paragraph_returns_empty_when_only_headings():
+    fp = _import_first_paragraph()
+    assert fp("## Foo\n\n## Bar") == ""
+
+
+def test_first_paragraph_unchanged_for_prose_first():
+    fp = _import_first_paragraph()
+    assert fp("Intro prose.\n\n## Section") == "Intro prose."
+
+
+# ---- structural: intro prose required (issue #19) ----
+
+@pytest.mark.parametrize(("filename", "expected_adrs"), EXPECTED_DOCTRINE)
+def test_doctrine_doc_has_intro_prose(filename: str, expected_adrs: list[str]) -> None:
+    """Each doctrine doc must have a non-heading paragraph between frontmatter
+    and the first ## heading. Required so doctrine-index injection surfaces
+    an informative summary line.
+
+    We inspect the FIRST non-empty chunk directly rather than calling
+    _first_paragraph(), because _first_paragraph skips headings and would
+    silently pass docs shaped '## Heading\\n\\nProse'. This test guards the
+    position invariant, not just the existence of prose.
+    """
+    _, body = _parse_doctrine(DOCTRINE_DIR / filename)
+    first_chunk = next(
+        (c.strip() for c in body.strip().split("\n\n") if c.strip()),
+        "",
+    )
+    assert first_chunk, f"{filename}: body is empty"
+    assert not first_chunk.startswith("#"), (
+        f"{filename}: no intro prose before first heading — "
+        f"body starts with heading: {first_chunk!r}"
+    )

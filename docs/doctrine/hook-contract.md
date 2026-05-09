@@ -3,6 +3,8 @@ title: Hook contract
 last_updated: 2026-05-09
 ---
 
+How Claude Code hooks integrate with `claude-workflow`: the stdin/stdout/exit-code contract, which hooks are shipped and what each does, and the rules for adding new ones.
+
 ## Overview
 
 Hooks are the enforcement boundary between Claude (the AI actor) and the `claude-workflow` framework. Each hook is a **separate Python process** — not in-context code — that Claude Code spawns when a matching tool event fires. The process lifecycle follows a strict stdin/stdout/exit-code contract:

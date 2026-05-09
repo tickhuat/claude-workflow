@@ -3,6 +3,8 @@ title: Config model
 last_updated: 2026-05-09
 ---
 
+How `claude-workflow` is configured: a three-layer model (Python DEFAULTS, shipped YAML, gitignored local override) plus the conventions that keep them in sync.
+
 ## Three configuration layers
 
 `claude-workflow` externalizes its tuneable behavior into a three-layer configuration model introduced in [ADR 0007](../../ADR/0007-dev-rules-config-externalization.md). The layers, from lowest to highest priority:

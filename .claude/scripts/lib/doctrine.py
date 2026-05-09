@@ -18,11 +18,17 @@ def doctrine_dir() -> Path:
 
 
 def _first_paragraph(body: str) -> str:
-    """Return first non-empty paragraph of body, single-line."""
+    """Return first non-empty, non-heading paragraph of body, single-line.
+
+    Chunks starting with '#' are treated as markdown headings and skipped
+    so doctrine-index summaries never surface raw markup. Returns "" if no
+    qualifying chunk exists; downstream consumers guard for empty.
+    """
     for chunk in body.strip().split("\n\n"):
         chunk = chunk.strip()
-        if chunk:
-            return " ".join(chunk.split())
+        if not chunk or chunk.startswith("#"):
+            continue
+        return " ".join(chunk.split())
     return ""
 
 
