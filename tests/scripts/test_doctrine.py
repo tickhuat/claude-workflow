@@ -161,3 +161,34 @@ def test_list_doctrine_empty_when_no_dir(tmp_path, monkeypatch):
     from lib.doctrine import list_doctrine
 
     assert list_doctrine() == []
+
+
+
+
+# ---- _first_paragraph heading-skip behaviour (issue #19) ----
+
+def _import_first_paragraph():
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+    from lib.doctrine import _first_paragraph
+    return _first_paragraph
+
+
+def test_first_paragraph_skips_leading_heading():
+    fp = _import_first_paragraph()
+    assert fp("## Foo\n\nBody text.") == "Body text."
+
+
+def test_first_paragraph_skips_multiple_headings():
+    fp = _import_first_paragraph()
+    assert fp("## Foo\n\n### Bar\n\nReal body here.") == "Real body here."
+
+
+def test_first_paragraph_returns_empty_when_only_headings():
+    fp = _import_first_paragraph()
+    assert fp("## Foo\n\n## Bar") == ""
+
+
+def test_first_paragraph_unchanged_for_prose_first():
+    fp = _import_first_paragraph()
+    assert fp("Intro prose.\n\n## Section") == "Intro prose."
