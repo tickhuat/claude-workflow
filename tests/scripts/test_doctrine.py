@@ -71,7 +71,7 @@ def _parse_doctrine(path: Path) -> tuple[dict, str]:
     end = text.find("\n---\n", 4)
     if end < 0:
         raise AssertionError(f"{path.name}: unterminated frontmatter")
-    fm = yaml.safe_load(text[4:end])
+    fm = yaml.safe_load(text[4:end]) or {}
     body = text[end + 5 :]
     return fm, body
 
