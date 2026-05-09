@@ -30,6 +30,18 @@ EVENT_FLAG_TO_SKILL: dict[str, str] = {
 }
 
 
+# Skills that change the active mode. Single source of truth for:
+#   (a) post_skill writing state.mode (skill name -> mode name)
+#   (b) pre_skill bypassing the current-mode required_stages gate for these
+#       skills (target stage belongs to a *different* mode's flow).
+# Mid-flow lock is enforced by SKILL_TO_STAGE only listing {idle, done} as
+# valid source stages — other stages produce next_stage_after_skill -> None.
+MODE_SWITCH_SKILLS: dict[str, str] = {
+    "switch-mode-bugfix": "bugfix",
+    "switch-mode-feature": "feature",
+}
+
+
 # Derived: skill → event_flag it clears (inverse of EVENT_FLAG_TO_SKILL)
 SKILL_CLEARS_FLAG: dict[str, str] = {v: k for k, v in EVENT_FLAG_TO_SKILL.items()}
 

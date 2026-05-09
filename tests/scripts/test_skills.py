@@ -70,3 +70,12 @@ def test_using_git_worktrees_not_in_skill_to_stage_table():
     """The entry must be removed entirely (not just set to empty)."""
     from claude_workflow.lib.skills import SKILL_TO_STAGE
     assert "using-git-worktrees" not in SKILL_TO_STAGE
+
+
+def test_mode_switch_skills_table_shape():
+    """MODE_SWITCH_SKILLS maps switch-mode-<name> -> <name> for each registered mode-switch skill."""
+    from claude_workflow.lib.skills import MODE_SWITCH_SKILLS
+    assert MODE_SWITCH_SKILLS == {
+        "switch-mode-bugfix": "bugfix",
+        "switch-mode-feature": "feature",
+    }
