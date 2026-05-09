@@ -39,6 +39,9 @@ the retroactive sections below for prior rounds.
 
 ### Changed
 
+- ADR injection at `on_user_prompt` filters to `Accepted` ADRs only,
+  trimming the per-prompt token tax — quick-win that pre-dates the full
+  doctrine separation. ([ADR 0025](ADR/0025-adr-injection-accepted-only.md))
 - ADR injection at `on_user_prompt` now injects doctrine summaries
   rather than the full ADR title list. From the fork user's perspective,
   `ADR/` is frozen at 0025 and removed by `init-fresh.sh`.
@@ -57,12 +60,6 @@ the retroactive sections below for prior rounds.
 - `switch-mode-feature` target stage corrected from `brainstorming`
   (a skill name, not a stage) to `session-started`.
   ([ADR 0028 addendum](ADR/0028-bugfix-mode-prototype.md#addendum-2026-05-10-switch-mode-feature-target-stage-corrected))
-
-### Removed
-
-- (No removals in this release. `lib/runtime_paths.py` was retained
-  rather than deleted as originally proposed; see
-  [ADR 0030 addendum](ADR/0030-distribution-pypi-architecture.md#addendum-2026-05-09-libruntime_pathspy-retained-not-deleted).)
 
 ---
 
@@ -91,8 +88,6 @@ State machine hardening and DX bucket — the third review round.
   ([ADR 0021](ADR/0021-pep621-optional-dependencies.md))
 - `notify.sh` cross-platform: `osascript` on macOS, `notify-send` on
   Linux/WSL. ([ADR 0022](ADR/0022-notify-sh-cross-platform.md))
-- ADR injection: Accepted-only filter as a quick-win before doctrine
-  separation. ([ADR 0025](ADR/0025-adr-injection-accepted-only.md))
 - Custom `glob_match` replaced with `pathspec` library.
   ([ADR 0014](ADR/0014-pathspec-glob-unification.md))
 - `lib/config.DEFAULTS` synced with shipped `dev-rules.config.yaml`;
@@ -102,8 +97,9 @@ State machine hardening and DX bucket — the third review round.
   ([ADR 0016](ADR/0016-centralize-skill-tables.md))
 - `lib/state.set_stage` now validates stage names; dead `can_transition`
   removed. ([ADR 0013](ADR/0013-stage-name-validation.md))
-- Context-pressure detection prototyped (ADR 0023) then reverted in full
-  after dogfood revealed four root-cause failures.
+- Context-pressure detection prototyped then reverted in full after
+  dogfood revealed four distinct root-cause failures (filesystem-as-state
+  proxy is structurally unworkable for this signal).
   ([ADR 0024](ADR/0024-context-pressure-detection-deferred.md))
 
 ## [0.2.0] — 2026-04-29 (retroactive, untagged)
