@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit hook：注入 ADR index 摘要 + 偵測 event_flags。"""
+"""UserPromptSubmit hook：注入 Doctrine index 摘要 + 偵測 event_flags。"""
 from __future__ import annotations
 
 import json
@@ -73,7 +73,7 @@ def main() -> int:
         current[k] = v
     s.save()
 
-    # Inject ADR index
+    # Inject doctrine index
     _print_doctrine_index()
     return 0
 
