@@ -539,3 +539,39 @@ def test_pre_skill_blocks_switch_mode_bugfix_mid_flow(set_stage):
     from claude_workflow.lib.skills import next_stage_after_skill
     assert next_stage_after_skill("switch-mode-bugfix", "spec-ready") is None
     assert next_stage_after_skill("switch-mode-feature", "spec-ready") is None
+
+
+def test_post_skill_switch_mode_bugfix_writes_state_mode(set_stage):
+    """ADR 0028: post_skill writes state.mode = 'bugfix' AND advances stage to
+    exec-running when Skill(switch-mode-bugfix) is invoked from idle."""
+    set_stage(stage="idle", mode="feature")
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-bugfix"}}, Path.cwd())
+    assert r.returncode == 0, f"hook errored: stderr={r.stderr}"
+    state = json.loads((Path.cwd() / ".claude" / "dev-state.json").read_text())
+    assert state["mode"] == "bugfix"
+    assert state["stage"] == "exec-running"
+    assert "switch-mode-bugfix" in state["skills_invoked"]
+
+
+def test_post_skill_switch_mode_feature_writes_state_mode(set_stage):
+    """Reverse: from done in bugfix mode, Skill(switch-mode-feature) restores
+    state.mode='feature' and advances to session-started."""
+    set_stage(stage="done", mode="bugfix")
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-feature"}}, Path.cwd())
+    assert r.returncode == 0, f"hook errored: stderr={r.stderr}"
+    state = json.loads((Path.cwd() / ".claude" / "dev-state.json").read_text())
+    assert state["mode"] == "feature"
+    assert state["stage"] == "session-started"
+
+
+def test_post_skill_switch_mode_no_op_when_mid_flow(set_stage):
+    """Mid-flow lock: from spec-ready, Skill(switch-mode-bugfix) must NOT
+    write state.mode and must NOT advance stage. The mid-flow lock works
+    because next_stage_after_skill returns None (no transition is attempted),
+    and post_skill's _try_transition early-returns without touching mode."""
+    set_stage(stage="spec-ready", mode="feature")
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-bugfix"}}, Path.cwd())
+    assert r.returncode == 0
+    state = json.loads((Path.cwd() / ".claude" / "dev-state.json").read_text())
+    assert state["mode"] == "feature", "mid-flow switch should not have changed mode"
+    assert state["stage"] == "spec-ready", "mid-flow switch should not have changed stage"

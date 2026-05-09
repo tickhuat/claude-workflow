@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from claude_workflow.lib.frontmatter import parse, FrontmatterError
-from claude_workflow.lib.skills import SKILL_CLEARS_FLAG
+from claude_workflow.lib.skills import MODE_SWITCH_SKILLS, SKILL_CLEARS_FLAG
 from claude_workflow.lib.state import State, StateError, next_stage_after_skill, project_root
 
 
@@ -95,6 +95,12 @@ def _try_transition(state: State, skill: str) -> None:
             state.data["phases_total"] = len(fm.get("phases") or [])
         except FrontmatterError:
             return
+    # ADR 0028: mode-switching skills write state.mode atomically with the
+    # stage transition. The lookup is keyed on skill name, not on target,
+    # because two different skills can share a target stage (e.g. both
+    # switch-mode-bugfix and executing-plans land at exec-running).
+    if skill in MODE_SWITCH_SKILLS:
+        state.data["mode"] = MODE_SWITCH_SKILLS[skill]
     state.set_stage(target)
 
 
