@@ -201,11 +201,19 @@ def test_doctrine_doc_has_intro_prose(filename: str, expected_adrs: list[str]) -
     """Each doctrine doc must have a non-heading paragraph between frontmatter
     and the first ## heading. Required so doctrine-index injection surfaces
     an informative summary line.
+
+    We inspect the FIRST non-empty chunk directly rather than calling
+    _first_paragraph(), because _first_paragraph skips headings and would
+    silently pass docs shaped '## Heading\\n\\nProse'. This test guards the
+    position invariant, not just the existence of prose.
     """
     _, body = _parse_doctrine(DOCTRINE_DIR / filename)
-    fp = _import_first_paragraph()
-    summary = fp(body)
-    assert summary, f"{filename}: no intro prose (first_paragraph is empty)"
-    assert not summary.startswith("#"), (
-        f"{filename}: first paragraph is a heading: {summary!r}"
+    first_chunk = next(
+        (c.strip() for c in body.strip().split("\n\n") if c.strip()),
+        "",
+    )
+    assert first_chunk, f"{filename}: body is empty"
+    assert not first_chunk.startswith("#"), (
+        f"{filename}: no intro prose before first heading — "
+        f"body starts with heading: {first_chunk!r}"
     )
