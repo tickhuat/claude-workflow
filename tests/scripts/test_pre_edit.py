@@ -339,6 +339,109 @@ def test_pre_edit_sensitive_path_passes_when_in_target_files(tmp_project, set_st
     assert r.returncode == 0, f"sensitive file in target_files wrongly blocked: stderr={r.stderr!r}"
 
 
+def test_pre_edit_skips_spec_ready_block_when_require_spec_false(tmp_project):
+    """A mode with require_spec=false bypasses pre_edit's stage='spec-ready' src block."""
+    import json
+    import os
+    import subprocess
+    import sys
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text(
+        "modes:\n"
+        "  feature:\n"
+        "    required_stages: [idle, session-started, spec-ready, plan-ready, "
+        "exec-running, all-phases-verified, reviewed, done]\n"
+        "    require_spec: true\n"
+        "    require_plan: true\n"
+        "    require_phase_verify: true\n"
+        "    require_review: true\n"
+        "    sensitive_globs_strict: true\n"
+        "  loose:\n"
+        "    required_stages: [idle, exec-running, reviewed, done]\n"
+        "    require_spec: false\n"
+        "    require_plan: false\n"
+        "    require_phase_verify: false\n"
+        "    require_review: true\n"
+        "    sensitive_globs_strict: true\n"
+    )
+    state_path = tmp_project / ".claude" / "dev-state.json"
+    state_path.write_text(json.dumps({
+        "schema_version": 3, "stage": "spec-ready", "mode": "loose",
+        "current_spec": None, "current_plan": None,
+        "skills_invoked": [], "adrs_read": [], "deviation_log": [],
+        "event_flags": {"debug_required": False, "parallel_required": False, "review_required": False},
+    }))
+    src = tmp_project / "src" / "claude_workflow" / "lib" / "newfile.py"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    event = {"tool_name": "Edit", "tool_input": {"file_path": str(src)}}
+    proc = subprocess.run(
+        [sys.executable, "-m", "claude_workflow.hooks.pre_edit"],
+        input=json.dumps(event), capture_output=True, text=True, cwd=tmp_project,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
+    )
+    assert proc.returncode == 0, f"expected pass, got rc={proc.returncode}, stderr={proc.stderr}"
+
+
+def test_pre_edit_blocks_in_spec_ready_when_require_spec_true(tmp_project):
+    """Default feature mode (require_spec=true): spec-ready blocks src edits as today."""
+    import json
+    import os
+    import subprocess
+    import sys
+    state_path = tmp_project / ".claude" / "dev-state.json"
+    state_path.write_text(json.dumps({
+        "schema_version": 3, "stage": "spec-ready", "mode": "feature",
+        "current_spec": None, "current_plan": None,
+        "skills_invoked": [], "adrs_read": [], "deviation_log": [],
+        "event_flags": {"debug_required": False, "parallel_required": False, "review_required": False},
+    }))
+    src = tmp_project / "src" / "claude_workflow" / "lib" / "newfile.py"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    event = {"tool_name": "Edit", "tool_input": {"file_path": str(src)}}
+    proc = subprocess.run(
+        [sys.executable, "-m", "claude_workflow.hooks.pre_edit"],
+        input=json.dumps(event), capture_output=True, text=True, cwd=tmp_project,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
+    )
+    assert proc.returncode == 2, f"expected BLOCK, got rc={proc.returncode}"
+
+
+def test_pre_edit_skips_sensitive_block_when_sensitive_globs_strict_false(tmp_project):
+    """A mode with sensitive_globs_strict=false converts the sensitive-paths block into passthrough."""
+    import json
+    import os
+    import subprocess
+    import sys
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text(
+        "modes:\n"
+        "  permissive:\n"
+        "    required_stages: [idle, exec-running, done]\n"
+        "    require_spec: false\n"
+        "    require_plan: false\n"
+        "    require_phase_verify: false\n"
+        "    require_review: false\n"
+        "    sensitive_globs_strict: false\n"
+        "sensitive_globs: ['**/auth*']\n"
+    )
+    state_path = tmp_project / ".claude" / "dev-state.json"
+    state_path.write_text(json.dumps({
+        "schema_version": 3, "stage": "exec-running", "mode": "permissive",
+        "current_spec": None, "current_plan": None,
+        "skills_invoked": [], "adrs_read": [], "deviation_log": [],
+        "event_flags": {"debug_required": False, "parallel_required": False, "review_required": False},
+    }))
+    src = tmp_project / "src" / "auth.py"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    event = {"tool_name": "Edit", "tool_input": {"file_path": str(src)}}
+    proc = subprocess.run(
+        [sys.executable, "-m", "claude_workflow.hooks.pre_edit"],
+        input=json.dumps(event), capture_output=True, text=True, cwd=tmp_project,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
+    )
+    assert proc.returncode == 0, f"expected PASS, got rc={proc.returncode}, stderr={proc.stderr}"
+
+
 def test_pre_edit_single_save_when_event_flag_and_deviation_both_fire(tmp_project, set_stage, monkeypatch):
     """Regression: previously pre_edit saved twice in one invocation when both
     event_flag warn-once and deviation_log append fired. Now should save once."""

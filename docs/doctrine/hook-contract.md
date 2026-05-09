@@ -127,6 +127,8 @@ Per ADR 0012, if the strip logic is factored into a reusable helper it belongs i
 
 **Schema migration errors.** If a migration function fails, `State.load()` re-raises rather than silently masking the error. The hook exits 1 (warn, don't block). A `[WARN by dev-rules]` line is printed; the in-memory state is the partially-migrated value.
 
+**Severity at config-load time.** `[ERROR by dev-rules]` is also used at config-load time when an individual record (e.g., a malformed `modes:` entry) must be dropped while the rest of the load proceeds. The hook does NOT exit non-zero in that case — the diagnostic flags a recoverable misconfiguration rather than fatal state corruption. `[WARN by dev-rules]` remains the right choice for "operational anomalies that don't reflect misconfiguration" (e.g., the Phase 2 `state.mode` fall-back to `feature`). When in doubt, prefer ERROR for misconfiguration the user authored, WARN for anomalies the framework recovered from.
+
 ---
 
 ## Stability

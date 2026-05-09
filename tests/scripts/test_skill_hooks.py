@@ -381,6 +381,84 @@ def test_pre_skill_warns_when_adrs_is_string(tmp_project):
     assert "list" in r.stderr.lower()
 
 
+def test_pre_skill_blocks_when_target_outside_mode_required_stages(tmp_project):
+    """If state.mode's required_stages doesn't list the target stage, pre_skill blocks.
+
+    Synthetic mode 'restricted' lists only [idle, done] — no spec/plan stages.
+    Brainstorming would target spec-ready, which is outside the list.
+    """
+    import json
+    import os
+    import subprocess
+    import sys
+    cfg = tmp_project / ".claude" / "dev-rules.config.yaml"
+    cfg.write_text(
+        "modes:\n"
+        "  feature:\n"
+        "    required_stages: [idle, session-started, spec-ready, plan-ready, "
+        "exec-running, all-phases-verified, reviewed, done]\n"
+        "    require_spec: true\n"
+        "    require_plan: true\n"
+        "    require_phase_verify: true\n"
+        "    require_review: true\n"
+        "    sensitive_globs_strict: true\n"
+        "  restricted:\n"
+        "    required_stages: [idle, done]\n"
+        "    require_spec: false\n"
+        "    require_plan: false\n"
+        "    require_phase_verify: false\n"
+        "    require_review: false\n"
+        "    sensitive_globs_strict: true\n"
+    )
+    state_path = tmp_project / ".claude" / "dev-state.json"
+    state_path.write_text(json.dumps({
+        "schema_version": 3,
+        "stage": "session-started",
+        "mode": "restricted",
+        "current_spec": None,
+        "current_plan": None,
+        "skills_invoked": [],
+        "adrs_read": [],
+        "deviation_log": [],
+        "event_flags": {"debug_required": False, "parallel_required": False, "review_required": False},
+    }))
+    event = {"tool_name": "Skill", "tool_input": {"skill": "brainstorming"}}
+    proc = subprocess.run(
+        [sys.executable, "-m", "claude_workflow.hooks.pre_skill"],
+        input=json.dumps(event), capture_output=True, text=True, cwd=tmp_project,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
+    )
+    assert proc.returncode == 2, f"expected BLOCK, got rc={proc.returncode}, stderr={proc.stderr}"
+    assert "spec-ready" in proc.stderr or "restricted" in proc.stderr
+
+
+def test_pre_skill_passes_when_target_in_mode_required_stages(tmp_project):
+    """feature mode includes all stages → using-superpowers idle→session-started passes."""
+    import json
+    import os
+    import subprocess
+    import sys
+    state_path = tmp_project / ".claude" / "dev-state.json"
+    state_path.write_text(json.dumps({
+        "schema_version": 3,
+        "stage": "idle",
+        "mode": "feature",
+        "current_spec": None,
+        "current_plan": None,
+        "skills_invoked": [],
+        "adrs_read": [],
+        "deviation_log": [],
+        "event_flags": {"debug_required": False, "parallel_required": False, "review_required": False},
+    }))
+    event = {"tool_name": "Skill", "tool_input": {"skill": "using-superpowers"}}
+    proc = subprocess.run(
+        [sys.executable, "-m", "claude_workflow.hooks.pre_skill"],
+        input=json.dumps(event), capture_output=True, text=True, cwd=tmp_project,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
+    )
+    assert proc.returncode == 0, f"expected PASS, got rc={proc.returncode}, stderr={proc.stderr}"
+
+
 def test_post_skill_auto_advance_does_not_overflow_phases_total(tmp_project, set_stage):
     """Edge case: phases_verified is gappy and current_phase=N, but n+1 > phases_total.
     Without the guard, current_phase would become n+1 (out of bounds)."""

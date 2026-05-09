@@ -28,6 +28,7 @@ from claude_workflow.lib.config import load_config
 from claude_workflow.lib.frontmatter import parse, FrontmatterError
 from claude_workflow.lib.glob_match import matches_any
 from claude_workflow.lib.messages import format_block
+from claude_workflow.lib.modes import current_mode_config
 from claude_workflow.lib.skills import EVENT_FLAG_TO_SKILL
 from claude_workflow.lib.state import State, StateError, phase_key, project_root
 
@@ -101,9 +102,15 @@ def _check_dot_claude_skills(rel: str, s: State, stage: str) -> int | None:
     return 2
 
 
-def _check_sensitive_paths(rel: str, s: State, stage: str, sensitive_globs: list[str]) -> int | None:
+def _check_sensitive_paths(rel: str, s: State, stage: str, sensitive_globs: list[str], strict: bool) -> int | None:
     """Sensitive paths block unless in current phase's target_files. Returns 2/None.
-    NOTE: must be checked BEFORE global_whitelist — see comment in main()."""
+    NOTE: must be checked BEFORE global_whitelist — see comment in main().
+
+    `strict` toggles whether matches are blocked (true, today's behaviour for feature mode)
+    or allowed-with-no-action (false, for permissive modes).
+    """
+    if not strict:
+        return None  # mode opted out of sensitive-paths enforcement
     if not matches_any(rel, sensitive_globs):
         return None
     targets = _current_phase_targets(s)
@@ -122,8 +129,13 @@ def _check_sensitive_paths(rel: str, s: State, stage: str, sensitive_globs: list
     return 2
 
 
-def _check_stage_gating(rel: str, stage: str) -> int | None:
-    """Pre-exec stages block src edits. Returns 2/None."""
+def _check_stage_gating(rel: str, stage: str, require_spec: bool, require_plan: bool) -> int | None:
+    """Pre-exec stages block src edits. Returns 2/None.
+
+    `require_spec` / `require_plan` come from the mode record; when false, the
+    corresponding stage's block is skipped (the mode does not depend on that
+    artifact existing before src edits). idle/session-started always block.
+    """
     if stage in ("idle", "session-started"):
         print(format_block(
             problem=f"在 stage={stage} 不可 Edit src（{rel}）。",
@@ -131,14 +143,14 @@ def _check_stage_gating(rel: str, stage: str) -> int | None:
             actions=["呼叫 Skill(skill=\"brainstorming\")"],
         ), file=sys.stderr)
         return 2
-    if stage == "spec-ready":
+    if stage == "spec-ready" and require_spec:
         print(format_block(
             problem=f"spec-ready 階段不可 Edit src（{rel}）。",
             stage=stage,
             actions=["呼叫 Skill(skill=\"writing-plans\") 把 spec 轉成 plan"],
         ), file=sys.stderr)
         return 2
-    if stage == "plan-ready":
+    if stage == "plan-ready" and require_plan:
         print(format_block(
             problem=f"plan-ready 階段不可 Edit src（{rel}）。",
             stage=stage,
@@ -273,18 +285,19 @@ def main() -> int:
 
     cfg = load_config()
     stage = s.data["stage"]
+    mode = current_mode_config(s)
     dirty = _warn_event_flags(s)
 
     if (rc := _check_dot_claude_skills(rel, s, stage)) is not None:
         return _finalize(rc, dirty, s)
 
-    if (rc := _check_sensitive_paths(rel, s, stage, cfg["sensitive_globs"])) is not None:
+    if (rc := _check_sensitive_paths(rel, s, stage, cfg["sensitive_globs"], mode.sensitive_globs_strict)) is not None:
         return _finalize(rc, dirty, s)
 
     if matches_any(rel, cfg["global_whitelist"]):
         return _finalize(0, dirty, s)
 
-    if (rc := _check_stage_gating(rel, stage)) is not None:
+    if (rc := _check_stage_gating(rel, stage, mode.require_spec, mode.require_plan)) is not None:
         return _finalize(rc, dirty, s)
 
     exec_result = _check_exec_stage(rel, s, stage)
