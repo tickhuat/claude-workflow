@@ -4,14 +4,33 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "scripts" / "init-fresh.sh"
 
 
+@pytest.fixture(autouse=True)
+def _stub_pip(tmp_path, monkeypatch):
+    """Stub `pip` on PATH so init-fresh.sh's `pip install -e .` is a no-op.
+
+    Phase 4 added `pip install -e .` to the script. Pytest-spawned subshells
+    don't see venv's pip on PATH, and even if they did, running the install
+    against the test's tmp_path would mutate the caller's site-packages.
+    A no-op stub keeps the test hermetic.
+    """
+    bin_dir = tmp_path / "_pip_stub_bin"
+    bin_dir.mkdir(exist_ok=True)
+    fake_pip = bin_dir / "pip"
+    fake_pip.write_text("#!/usr/bin/env bash\nexit 0\n")
+    fake_pip.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
+
+
 def _seed_repo(dst: Path):
     """Copy enough of the project tree into dst to simulate a fresh fork."""
-    for sub in (".claude", "ADR", "docs/superpowers/specs",
-                "docs/superpowers/plans", "tests", "scripts", "src"):
+    for sub in (".claude", "src", "templates", "ADR", "docs/superpowers/specs",
+                "docs/superpowers/plans", "tests", "scripts"):
         src = PROJECT_ROOT / sub
         if src.exists():
             shutil.copytree(src, dst / sub, dirs_exist_ok=True)
@@ -140,3 +159,57 @@ def test_init_fresh_preserves_docs_doctrine(tmp_path):
     )
     assert r.returncode == 0, f"script failed: {r.stderr}"
     assert (d / "state-machine.md").exists()
+
+
+def test_init_fresh_script_invokes_pip_install():
+    """init-fresh.sh contains `pip install -e .`.
+
+    Behavioral assertion done at the script-text level rather than via a real
+    pip run — running `pip install -e .` from a tmp dir would mutate the
+    caller's site-packages and replace the dev env's claude-workflow with
+    one rooted in tmp_path. CI's own `pip install -e ".[dev]"` step covers
+    the live install behavior.
+    """
+    sh = (PROJECT_ROOT / "scripts" / "init-fresh.sh").read_text()
+    assert "pip install -e ." in sh, "init-fresh.sh missing `pip install -e .` step"
+
+
+def test_init_fresh_copies_templates_claude_baseline(tmp_path, monkeypatch):
+    """After init-fresh.sh, .claude/settings.json matches templates/.claude/settings.json."""
+    _seed_repo(tmp_path)
+    # Mock out the pip install line so the test doesn't pollute the env.
+    bin_dir = tmp_path / "_test_bin"
+    bin_dir.mkdir()
+    fake_pip = bin_dir / "pip"
+    fake_pip.write_text("#!/usr/bin/env bash\nexit 0\n")
+    fake_pip.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
+
+    r = subprocess.run(
+        ["bash", "scripts/init-fresh.sh"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert r.returncode == 0, f"script failed: {r.stderr}"
+
+    live = (tmp_path / ".claude" / "settings.json").read_text()
+    tpl = (tmp_path / "templates" / ".claude" / "settings.json").read_text()
+    assert live == tpl, "init-fresh.sh did not copy templates/.claude/settings.json"
+
+
+def test_init_fresh_copies_templates_dev_rules_config(tmp_path, monkeypatch):
+    """After init-fresh.sh, .claude/dev-rules.config.yaml matches the template copy."""
+    _seed_repo(tmp_path)
+    bin_dir = tmp_path / "_test_bin"
+    bin_dir.mkdir()
+    fake_pip = bin_dir / "pip"
+    fake_pip.write_text("#!/usr/bin/env bash\nexit 0\n")
+    fake_pip.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
+
+    subprocess.run(["bash", "scripts/init-fresh.sh"], cwd=tmp_path, check=True)
+
+    live = (tmp_path / ".claude" / "dev-rules.config.yaml").read_text()
+    tpl = (tmp_path / "templates" / ".claude" / "dev-rules.config.yaml").read_text()
+    assert live == tpl

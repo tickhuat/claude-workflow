@@ -28,6 +28,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Ensure framework is installed (editable mode so future upgrades are easy).
+echo "claude-workflow: installing framework (pip install -e .)..."
+pip install -e .
+
 echo "claude-workflow: stripping dogfood examples..."
 
 # Specs / plans — wildcard delete (these directories only hold dogfood at
@@ -54,6 +58,15 @@ echo '[]' > ADR/_index.json
 rm -f .claude/dev-state.json
 rm -f .claude/bypass.log
 rm -f .claude/bypass.log.old
+
+# Restore .claude/ baseline from shipped templates. We use cp -Rn so any
+# pre-existing user config (rare for a fresh fork, but possible) is
+# preserved. BSD cp returns 1 when -n skips a conflict (GNU cp returns 0);
+# the partial copy is still correct, so we tolerate that exit code here.
+if [[ -d templates/.claude ]]; then
+    echo "claude-workflow: copying templates/.claude/ baseline..."
+    cp -Rn templates/.claude/. .claude/ || true
+fi
 
 cat <<'EOF'
 

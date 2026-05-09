@@ -1,0 +1,52 @@
+# dev-rules 設定檔。每個欄位都有預設（lib/config.py 的 DEFAULTS），
+# 此檔只覆寫想改的欄位。本檔 commit 進 git，團隊共享。
+# 個人臨時調整放 .claude/dev-rules.config.local.yaml（gitignored）。
+
+# 敏感類型路徑（exec 階段碰到必擋並要新 ADR）
+sensitive_globs:
+  - "**/migrations/**"
+  - "**/schema*"
+  - "**/auth*"
+  - "**/*.config.*"
+
+# UserPromptSubmit 偵測詞 → 設 event_flags
+event_keywords:
+  debug_required:
+    - '\bbug\b'
+    - '\berror\b'
+    - "test fail"
+    - '\bexception\b'
+    - '\bcrash\b'
+    - "traceback"
+  parallel_required:
+    - "同時"
+    - "平行"
+    - "多個獨立"
+    - '\bparallel\b'
+  review_required:
+    - '\breview\b'
+    - "PR comment"
+    - '\bfeedback\b'
+
+# 全域白名單（這些路徑無視 stage 都通過）
+global_whitelist:
+  - "*.md"
+  - "*.css"
+  - "*.json"
+  - "*.toml"
+  - "*.yml"
+  - "*.yaml"
+  - "docs/**"
+  - ".claude/**"
+  - ".github/**"
+  - "tests/**"
+  - "ADR/**"
+  - "scripts/**"
+  - ".gitignore"
+  - "pyproject.toml"
+
+# 是否在 phase-N-verified 後自動推進到 N+1（exec-running）
+auto_advance_phase: true
+
+# commit message 必須含的偏離標記（pre_bash + post_bash 都用這條）
+commit_deviation_keyword: "Deviation:"
