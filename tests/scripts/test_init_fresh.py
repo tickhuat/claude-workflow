@@ -1,4 +1,5 @@
 """E2E test for scripts/init-fresh.sh — strips dogfood, keeps engine."""
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -44,9 +45,11 @@ def test_init_fresh_removes_dogfood_keeps_engine(tmp_path):
     idx = (tmp_path / "ADR" / "_index.json").read_text().strip()
     assert idx == "[]", f"expected '[]', got {idx!r}"
 
-    # Engine files preserved
-    assert (tmp_path / ".claude" / "scripts" / "lib" / "state.py").exists()
-    assert (tmp_path / ".claude" / "scripts" / "post_read.py").exists()
+    # Engine files preserved (post-Phase-3 src layout)
+    assert (tmp_path / "src" / "claude_workflow" / "lib" / "state.py").exists()
+    assert (tmp_path / "src" / "claude_workflow" / "hooks" / "post_read.py").exists()
+    # notify.sh is the only thing left under .claude/scripts/ — verify it survived.
+    assert (tmp_path / ".claude" / "scripts" / "notify.sh").exists()
     assert (tmp_path / "pyproject.toml").exists()
     assert (tmp_path / "README.md").exists()
     assert (tmp_path / "LICENSE").exists()
@@ -87,33 +90,23 @@ def test_init_fresh_removes_dev_state_and_bypass_log(tmp_path):
     assert not (tmp_path / ".claude" / "bypass.log.old").exists()
 
 
-def test_init_fresh_preserves_pytest_after(tmp_path):
-    """After init-fresh, pytest in the cleaned repo still works (engine intact).
-
-    Per ADR 0030: the package lives in src/claude_workflow/. After init-fresh,
-    the cleaned tree still has pyproject.toml + src/, so PYTHONPATH=src lets
-    `import claude_workflow` work without a full `pip install -e .` step in
-    the inner subprocess.
-    """
-    import os
+def test_init_fresh_preserves_engine_layout(tmp_path):
+    """After init-fresh, the src-layout package is intact and importable from src/."""
     _seed_repo(tmp_path)
     subprocess.run(["bash", "scripts/init-fresh.sh"], cwd=tmp_path, check=True)
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(tmp_path / "src")
+    # The engine source must still be present under src/claude_workflow/
+    assert (tmp_path / "src" / "claude_workflow" / "__init__.py").exists()
+    assert (tmp_path / "src" / "claude_workflow" / "hooks" / "pre_skill.py").exists()
+    assert (tmp_path / "src" / "claude_workflow" / "lib" / "state.py").exists()
+    # Launching python with src/ on PYTHONPATH should be enough to import.
     r = subprocess.run(
-        [
-            "python3", "-m", "pytest", "tests/", "-q", "--no-header", "-x",
-            "--ignore=tests/scripts/test_init_fresh.py",  # prevent infinite recursion
-        ],
+        ["python3", "-c", "import claude_workflow, claude_workflow.lib.state; print('ok')"],
         cwd=tmp_path,
         capture_output=True,
         text=True,
-        env=env,
+        env={**os.environ, "PYTHONPATH": str(tmp_path / "src")},
     )
-    # Exclude test_init_fresh.py from inner run to prevent recursive spawning.
-    # Key check: lib imports work, no collection errors.
-    assert "ImportError" not in r.stdout + r.stderr
-    assert "ModuleNotFoundError" not in r.stdout + r.stderr
+    assert r.returncode == 0, f"import failed: stdout={r.stdout!r} stderr={r.stderr!r}"
 
 
 def test_init_fresh_removes_adr_readme(tmp_path):

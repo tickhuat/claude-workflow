@@ -166,7 +166,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/on_user_prompt.py"
+            "command": "python3 -m claude_workflow.hooks.on_user_prompt"
           }
         ]
       }
@@ -177,7 +177,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/pre_skill.py"
+            "command": "python3 -m claude_workflow.hooks.pre_skill"
           }
         ]
       },
@@ -186,7 +186,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/pre_edit.py"
+            "command": "python3 -m claude_workflow.hooks.pre_edit"
           }
         ]
       },
@@ -195,7 +195,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/pre_bash.py"
+            "command": "python3 -m claude_workflow.hooks.pre_bash"
           }
         ]
       }
@@ -206,7 +206,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/post_skill.py"
+            "command": "python3 -m claude_workflow.hooks.post_skill"
           }
         ]
       },
@@ -215,7 +215,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/post_edit.py"
+            "command": "python3 -m claude_workflow.hooks.post_edit"
           }
         ]
       },
@@ -224,7 +224,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/post_read.py"
+            "command": "python3 -m claude_workflow.hooks.post_read"
           }
         ]
       },
@@ -233,7 +233,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/scripts/post_bash.py"
+            "command": "python3 -m claude_workflow.hooks.post_bash"
           }
         ]
       }

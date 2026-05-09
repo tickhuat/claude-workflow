@@ -217,10 +217,7 @@ def test_pre_edit_respects_custom_sensitive_globs(tmp_project, set_stage):
 def test_targets_include_tests_recognizes_various_patterns():
     """_targets_include_tests should accept any pattern that mentions 'test'
     as a path segment."""
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
-    from pre_edit import _targets_include_tests
+    from claude_workflow.hooks.pre_edit import _targets_include_tests
 
     # True positives — segment-aligned 'test' or 'tests'
     assert _targets_include_tests(["tests/**"]) is True
@@ -238,10 +235,7 @@ def test_targets_include_tests_recognizes_various_patterns():
 def test_targets_include_tests_rejects_substring_false_positives():
     """Regression for review feedback: 'test' as substring (not segment) must
     NOT trigger TDD enforcement (latest, protests, contests, attest, etc.)."""
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
-    from pre_edit import _targets_include_tests
+    from claude_workflow.hooks.pre_edit import _targets_include_tests
 
     assert _targets_include_tests(["latest/**"]) is False
     assert _targets_include_tests(["protests/**"]) is False
