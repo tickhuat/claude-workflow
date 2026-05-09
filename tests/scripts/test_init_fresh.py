@@ -11,20 +11,22 @@ SCRIPT = PROJECT_ROOT / "scripts" / "init-fresh.sh"
 
 
 @pytest.fixture(autouse=True)
-def _stub_pip(tmp_path, monkeypatch):
-    """Stub `pip` on PATH so init-fresh.sh's `pip install -e .` is a no-op.
+def _stub_venv(tmp_path):
+    """Pre-create a minimal .venv/ in tmp_path so init-fresh.sh's
+    venv-creation + pip-install steps are no-ops.
 
-    Phase 4 added `pip install -e .` to the script. Pytest-spawned subshells
-    don't see venv's pip on PATH, and even if they did, running the install
-    against the test's tmp_path would mutate the caller's site-packages.
-    A no-op stub keeps the test hermetic.
+    The script does `python3.X -m venv .venv && .venv/bin/pip install -e .`.
+    Both would otherwise need a real Python >=3.10 on PATH AND would mutate
+    the caller's site-packages. The pre-created `.venv/bin/python` makes
+    init-fresh.sh skip the venv creation (its `if [[ ! -x .venv/bin/python ]]`
+    guard short-circuits), and the no-op `.venv/bin/pip` swallows the install.
     """
-    bin_dir = tmp_path / "_pip_stub_bin"
-    bin_dir.mkdir(exist_ok=True)
-    fake_pip = bin_dir / "pip"
-    fake_pip.write_text("#!/usr/bin/env bash\nexit 0\n")
-    fake_pip.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
+    venv_bin = tmp_path / ".venv" / "bin"
+    venv_bin.mkdir(parents=True, exist_ok=True)
+    for name in ("python", "pip"):
+        p = venv_bin / name
+        p.write_text("#!/usr/bin/env bash\nexit 0\n")
+        p.chmod(0o755)
 
 
 def _seed_repo(dst: Path):
@@ -174,17 +176,9 @@ def test_init_fresh_script_invokes_pip_install():
     assert "pip install -e ." in sh, "init-fresh.sh missing `pip install -e .` step"
 
 
-def test_init_fresh_copies_templates_claude_baseline(tmp_path, monkeypatch):
+def test_init_fresh_copies_templates_claude_baseline(tmp_path):
     """After init-fresh.sh, .claude/settings.json matches templates/.claude/settings.json."""
     _seed_repo(tmp_path)
-    # Mock out the pip install line so the test doesn't pollute the env.
-    bin_dir = tmp_path / "_test_bin"
-    bin_dir.mkdir()
-    fake_pip = bin_dir / "pip"
-    fake_pip.write_text("#!/usr/bin/env bash\nexit 0\n")
-    fake_pip.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
-
     r = subprocess.run(
         ["bash", "scripts/init-fresh.sh"],
         cwd=tmp_path,
@@ -198,18 +192,10 @@ def test_init_fresh_copies_templates_claude_baseline(tmp_path, monkeypatch):
     assert live == tpl, "init-fresh.sh did not copy templates/.claude/settings.json"
 
 
-def test_init_fresh_copies_templates_dev_rules_config(tmp_path, monkeypatch):
+def test_init_fresh_copies_templates_dev_rules_config(tmp_path):
     """After init-fresh.sh, .claude/dev-rules.config.yaml matches the template copy."""
     _seed_repo(tmp_path)
-    bin_dir = tmp_path / "_test_bin"
-    bin_dir.mkdir()
-    fake_pip = bin_dir / "pip"
-    fake_pip.write_text("#!/usr/bin/env bash\nexit 0\n")
-    fake_pip.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
-
     subprocess.run(["bash", "scripts/init-fresh.sh"], cwd=tmp_path, check=True)
-
     live = (tmp_path / ".claude" / "dev-rules.config.yaml").read_text()
     tpl = (tmp_path / "templates" / ".claude" / "dev-rules.config.yaml").read_text()
     assert live == tpl

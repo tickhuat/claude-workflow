@@ -166,7 +166,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m claude_workflow.hooks.on_user_prompt"
+            "command": ".venv/bin/python -m claude_workflow.hooks.on_user_prompt"
           }
         ]
       }
@@ -177,7 +177,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m claude_workflow.hooks.pre_skill"
+            "command": ".venv/bin/python -m claude_workflow.hooks.pre_skill"
           }
         ]
       },
@@ -186,7 +186,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m claude_workflow.hooks.pre_edit"
+            "command": ".venv/bin/python -m claude_workflow.hooks.pre_edit"
           }
         ]
       },
@@ -195,7 +195,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m claude_workflow.hooks.pre_bash"
+            "command": ".venv/bin/python -m claude_workflow.hooks.pre_bash"
           }
         ]
       }
@@ -206,7 +206,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m claude_workflow.hooks.post_skill"
+            "command": ".venv/bin/python -m claude_workflow.hooks.post_skill"
           }
         ]
       },
@@ -215,7 +215,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m claude_workflow.hooks.post_edit"
+            "command": ".venv/bin/python -m claude_workflow.hooks.post_edit"
           }
         ]
       },
@@ -224,7 +224,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m claude_workflow.hooks.post_read"
+            "command": ".venv/bin/python -m claude_workflow.hooks.post_read"
           }
         ]
       },
@@ -233,7 +233,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -m claude_workflow.hooks.post_bash"
+            "command": ".venv/bin/python -m claude_workflow.hooks.post_bash"
           }
         ]
       }
