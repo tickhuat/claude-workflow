@@ -1,6 +1,6 @@
 ---
 title: Distribution and versioning
-last_updated: 2026-05-09
+last_updated: 2026-05-10
 ---
 
 Project identity, license, how the framework reaches users (`init-fresh.sh` scaffold today, PyPI later), and the SemVer policy that gates breaking changes.
@@ -123,7 +123,10 @@ Established in [ADR 0029](../../ADR/0029-version-policy-semver.md).
 
 **Post-1.0 breaking change convention:** a breaking change bumps MAJOR and requires a migration ADR.
 
-`CHANGELOG.md` is maintained manually, one section per release. Automation tools such as `release-please` or `commitlint` are deferred to a future issue and will be evaluated before v1.0.
+[`CHANGELOG.md`](../../CHANGELOG.md) is maintained manually, one
+section per release. Automation tools such as `release-please` or
+`commitlint` are deferred to a future issue and will be evaluated
+before v1.0.
 
 ---
 

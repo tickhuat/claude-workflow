@@ -30,3 +30,25 @@ def test_package_has_version_metadata() -> None:
     assert hasattr(claude_workflow, "__version__")
     assert isinstance(claude_workflow.__version__, str)
     assert claude_workflow.__version__  # non-empty version string
+
+
+def test_version_matches_pyproject() -> None:
+    """`claude_workflow.__version__` must equal pyproject.toml [project].version.
+
+    Cascade audit (Phase 5) found the two had drifted: pyproject was
+    bumped to 0.4.0 but __init__.py still read 0.4.0.dev0. This test
+    locks the invariant so the next bump can't repeat the mistake.
+    """
+    import sys
+    from pathlib import Path
+
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        import tomli as tomllib  # type: ignore[no-redef]
+
+    import claude_workflow
+
+    repo_root = Path(__file__).resolve().parents[2]
+    pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text())
+    assert claude_workflow.__version__ == pyproject["project"]["version"]
