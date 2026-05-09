@@ -11,7 +11,7 @@ Source: [ADR 0003](../../ADR/0003-adopt-pyyaml-core-dep.md)
 
 The original hand-rolled `lib/frontmatter.py` (~250 lines) could not reliably cover YAML corner cases; it was replaced with a ~10-line wrapper around `yaml.safe_load`. Python 3.10+'s stdlib is rich enough that no other external runtime library is needed, keeping the supply chain minimal.
 
-Canonical `pyproject.toml` entry:
+The full `[project.dependencies]` block — `pathspec` is also included per ADR 0014 (see Glob matching):
 
 ```toml
 [project]
@@ -77,6 +77,8 @@ def _flocked(path: Path, exclusive: bool):
         finally:
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 ```
+
+The snippet above is illustrative. The production implementation in `lib/state.py:_flocked` adds an `f.flush()` before unlock (a non-obvious requirement discovered from a CI flake on ubuntu-latest) and handles non-existent files on shared reads.
 
 `State.load()` acquires `LOCK_SH` (shared read); `State.save()` acquires `LOCK_EX` (exclusive write). No timeout is set — hooks are short-lived (<100 ms) and a deadlock signals a bug that should surface, not be hidden.
 
