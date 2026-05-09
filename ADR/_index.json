@@ -173,5 +173,40 @@
     "status": "Accepted",
     "file": "0025-adr-injection-accepted-only.md",
     "summary": "In `_print_adr_index` only:"
+  },
+  {
+    "id": "0026",
+    "title": "Framework / dev-history physical separation via docs/doctrine/ + frozen ADR/",
+    "status": "Accepted",
+    "file": "0026-framework-doctrine-separation.md",
+    "summary": "採用 **γ partition + 選項 1 機制**："
+  },
+  {
+    "id": "0027",
+    "title": "Multi-mode workflow — mode as first-class field with YAML records",
+    "status": "Accepted",
+    "file": "0027-mode-model-first-class.md",
+    "summary": "採用 **mode 為 first-class enum + per-mode YAML record**（Spec 0 軸 1 = A）："
+  },
+  {
+    "id": "0028",
+    "title": "bugfix as first prototyped mode + manual skill switch (Skill(switch-mode-*))",
+    "status": "Accepted",
+    "file": "0028-bugfix-mode-prototype.md",
+    "summary": "採用 **manual skill 切換（Spec 0 選項 α）**，第一個 prototype mode 為 **`bugfix`**："
+  },
+  {
+    "id": "0029",
+    "title": "Version policy — SemVer applied immediately, pre-1.0 breaking via MINOR bump",
+    "status": "Accepted",
+    "file": "0029-version-policy-semver.md",
+    "summary": "從 Round 4 結束起套用 SemVer："
+  },
+  {
+    "id": "0030",
+    "title": "Distribution — PyPI-installable architecture (deferred publish) + extension API contract",
+    "status": "Accepted",
+    "file": "0030-distribution-pypi-architecture.md",
+    "summary": "採用 **PyPI-installable architecture，但暫不發 PyPI**（Spec 0 選項 β）："
   }
 ]
