@@ -10,7 +10,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from lib.adr import index_path  # noqa: E402
+from lib.doctrine import list_doctrine  # noqa: E402
 from lib.config import load_config  # noqa: E402
 from lib.state import State, StateError  # noqa: E402
 
@@ -24,35 +24,21 @@ def _detect_flags(prompt: str) -> dict[str, bool]:
     return out
 
 
-def _print_adr_index() -> None:
-    p = index_path()
-    print("=== ADR Index (injected by dev-rules) ===")
-    if not p.exists():
+def _print_doctrine_index() -> None:
+    """Inject doctrine summary into prompt context.
+
+    Per ADR 0026: source switched from ADR/_index.json to docs/doctrine/.
+    """
+    print("=== Doctrine Index (injected by dev-rules) ===")
+    entries = list_doctrine()
+    if not entries:
         print("(empty)")
         return
-    try:
-        data = json.loads(p.read_text())
-    except json.JSONDecodeError:
-        print("(index corrupt — run rebuild)")
-        return
-    if not data:
-        print("(empty)")
-        return
-    # ADR 0025: filter to Accepted-only at injection time. _index.json stays
-    # complete; this filter is purely cosmetic for prompt injection cost.
-    accepted = [e for e in data if e.get("status") == "Accepted"]
-    hidden = [e for e in data if e.get("status") != "Accepted"]
-    for e in accepted:
-        line = f"- {e.get('id', '?')} [{e.get('status', '?')}] {e.get('title', '')} → {e.get('file', '')}"
-        summary = e.get("summary") or ""
-        if summary:
-            line += f" — {summary}"
+    for e in entries:
+        line = f"- [{e['title']}] → {e['file']}"
+        if e.get("summary"):
+            line += f" — {e['summary']}"
         print(line)
-    if hidden:
-        from collections import Counter
-        counts = Counter((e.get("status") or "(no status)") for e in hidden)
-        breakdown = ", ".join(f"{n} {s}" for s, n in sorted(counts.items()))
-        print(f"({len(hidden)} ADRs hidden: {breakdown} — see ADR/ for full history)")
 
 
 def main() -> int:
@@ -71,13 +57,13 @@ def main() -> int:
         s = State.load()
     except StateError as e:
         print(f"[WARN by dev-rules] dev-state.json corrupt; skipping state ops: {e}", file=sys.stderr)
-        _print_adr_index()
+        _print_doctrine_index()
         return 0
     # Optimization: skip the save() if no detection AND no flags are set.
     # Most prompts don't contain keywords; this is the hot path.
     current = s.data["event_flags"]
     if not flags and not any(current.values()):
-        _print_adr_index()
+        _print_doctrine_index()
         return 0
     # Reset all known flags to false
     for known_flag in current:
@@ -88,7 +74,7 @@ def main() -> int:
     s.save()
 
     # Inject ADR index
-    _print_adr_index()
+    _print_doctrine_index()
     return 0
 
 
