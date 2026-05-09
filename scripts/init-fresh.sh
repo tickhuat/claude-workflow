@@ -11,11 +11,13 @@
 #   - tests/, pyproject.toml, README.md, LICENSE, CLAUDE.md, .gitignore
 #   - .github/workflows/ (CI), scripts/init-fresh.sh (this file)
 #   - ADR/0000-template.md (template for new ADRs)
+#   - docs/doctrine/ (framework rules; ADR 0026)
 #
 # Removes:
 #   - docs/superpowers/specs/*.md (all dogfood specs)
 #   - docs/superpowers/plans/*.md (all dogfood plans)
 #   - ADR/*.md except 0000-template.md
+#   - ADR/README.md (maintainer-only freeze notice; ADR 0026)
 #   - .claude/dev-state.json (if present)
 #   - .claude/bypass.log (if present)
 #   - .claude/bypass.log.old (if present)
@@ -40,6 +42,10 @@ for adr in ADR/*.md; do
         rm -f "$adr"
     fi
 done
+
+# ADR/README.md is maintainer-only freeze notice (per ADR 0026); fork users
+# don't need it. Doctrine lives in docs/doctrine/ (preserved).
+rm -f ADR/README.md
 
 # Reset ADR index
 echo '[]' > ADR/_index.json
