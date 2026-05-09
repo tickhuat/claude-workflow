@@ -14,5 +14,8 @@ __pycache__/
 .claude/.pre-bash-debug.log
 .superpowers/
 
+# Git worktrees (created by superpowers:using-git-worktrees)
+.worktrees/
+
 # OS
 .DS_Store
