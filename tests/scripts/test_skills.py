@@ -115,3 +115,18 @@ def test_mode_switch_skills_keys_align_with_skill_to_stage():
     from claude_workflow.lib.skills import MODE_SWITCH_SKILLS, SKILL_TO_STAGE
     for skill in MODE_SWITCH_SKILLS:
         assert skill in SKILL_TO_STAGE, f"{skill!r} in MODE_SWITCH_SKILLS but not SKILL_TO_STAGE"
+
+
+def test_requesting_code_review_accepts_exec_running_for_bugfix_mode():
+    """Phase 4 / ADR 0028: bugfix mode (required_stages: [idle, exec-running,
+    reviewed, done]) reaches `reviewed` directly from `exec-running` without
+    going through `all-phases-verified`. The new exec-running -> reviewed
+    entry is what makes that transition resolvable."""
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("requesting-code-review", "exec-running") == "reviewed"
+
+
+def test_requesting_code_review_still_supports_all_phases_verified():
+    """Feature mode: requesting-code-review still maps all-phases-verified -> reviewed."""
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("requesting-code-review", "all-phases-verified") == "reviewed"

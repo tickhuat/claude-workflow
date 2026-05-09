@@ -17,7 +17,7 @@ SKILL_TO_STAGE: dict[str, dict[str, str]] = {
     "subagent-driven-development": {"plan-ready": "exec-running", "exec-prep": "exec-running"},
     # using-git-worktrees deliberately omitted (ADR 0020): it's a tool action,
     # not a state transition. record_skill() still tracks invocation.
-    "requesting-code-review": {"all-phases-verified": "reviewed"},
+    "requesting-code-review": {"all-phases-verified": "reviewed", "exec-running": "reviewed"},
     "finishing-a-development-branch": {"reviewed": "done"},
     "using-superpowers": {"idle": "session-started"},
     # ADR 0028: mode-switching skills. Only {idle, done} as valid source stages
