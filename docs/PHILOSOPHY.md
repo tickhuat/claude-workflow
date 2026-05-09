@@ -114,7 +114,9 @@ specs must respect:
 3. **End-to-end live verification before merge.** Unit tests + cascade audit
    inspect source. They don't see runtime divergence. Features that interact
    with Claude Code runtime state need a live-session verification step.
-   Now encoded as workflow step 8 in [CLAUDE.md](../CLAUDE.md).
+   Now encoded in `Skill(pre-integration-audit)` (workflow step 7 in
+   [CLAUDE.md](../CLAUDE.md)), which orchestrates `cascade-auditing` then
+   `live-verification`.
 
 4. **Doctrine accumulates faster than enforcement.** Adding "remember to do
    X" to CLAUDE.md is cheap. Adding a hook that gates X is expensive.

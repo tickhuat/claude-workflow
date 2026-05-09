@@ -11,9 +11,8 @@ This repo enforces a structured development flow via Claude Code hooks. Spec: `d
 4. `Skill(executing-plans)` or `subagent-driven-development` → enters exec-running
 5. Per phase: write tests first (TDD), implement, verify via fresh `Agent` subagent ending with `VERIFY-PASS phase=N`
 6. `Skill(requesting-code-review)` — per-PR feedback from a fresh subagent
-7. **Cascade audit** — dispatch a `general-purpose` Agent to look at the FINAL codebase state (not just diff) for "changed-A-broke-B" cross-cutting issues. Catches bugs the per-PR review misses (e.g., glob semantics shift shadowing sensitive paths, regex changes affecting unrelated callers).
-8. **Live verification** — when the feature interacts with Claude Code runtime state (hooks, `.claude/dev-state.json`, transcript JSONL under `~/.claude/projects/`, anything in `.claude/scripts/`), run it end-to-end in a real session and inspect actual state (e.g., `cat .claude/dev-state.json`). Code review + cascade audit inspect source — they don't see runtime divergence. See [ADR 0024](ADR/0024-context-pressure-detection-deferred.md) lesson #3 for the failure mode this prevents.
-9. `Skill(finishing-a-development-branch)` → done
+7. **Pre-integration audit** — `Skill(pre-integration-audit)` runs cascade audit (cross-cutting "changed-A-broke-B" issues) then live verification (when changes touch Claude Code runtime state). See `.claude/skills/pre-integration-audit/SKILL.md`.
+8. `Skill(finishing-a-development-branch)` → done
 
 **Constraints:**
 - Spec/plan frontmatter MUST list `adrs:` referencing existing ADR slugs
