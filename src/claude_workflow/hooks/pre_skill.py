@@ -17,7 +17,7 @@ from claude_workflow.lib.frontmatter import FrontmatterError, parse
 from claude_workflow.lib.messages import format_block
 from claude_workflow.lib.modes import current_mode_config
 from claude_workflow.lib.skills import GATED_SKILLS as _GATED_SKILLS
-from claude_workflow.lib.skills import next_stage_after_skill
+from claude_workflow.lib.skills import MODE_SWITCH_SKILLS, next_stage_after_skill
 from claude_workflow.lib.state import State, StateError, project_root
 
 
@@ -94,7 +94,15 @@ def main() -> int:
     # has a SKILL_TO_STAGE transition; skills without a transition (e.g.
     # using-git-worktrees per ADR 0020) get target=None and are exempt.
     target = next_stage_after_skill(skill, s.data["stage"])
-    if target is not None:
+    if target is not None and skill not in MODE_SWITCH_SKILLS:
+        # Mode-switching skills (ADR 0028) are exempt: their target stage
+        # belongs to a *different* mode's flow, so validating against the
+        # current mode's required_stages would falsely block legitimate
+        # switches (e.g. switch-mode-feature from done while state.mode=bugfix
+        # lands at session-started, which is not in bugfix's required_stages).
+        # Mid-flow lock is enforced upstream: SKILL_TO_STAGE only has entries
+        # for source stages {idle, done}, so any other stage produces target=None
+        # and this branch is skipped entirely.
         mc = current_mode_config(s)
         rs = mc.required_stages
         if target not in rs:
