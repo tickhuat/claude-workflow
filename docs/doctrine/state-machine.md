@@ -106,9 +106,10 @@ Phase tracking fields in the state:
 | `adrs_read` | list[str] | ADR slugs confirmed read by the pre-skill gate |
 | `deviation_log` | list[dict] | Records of files touched outside `target_files` per phase |
 | `event_flags` | dict | Per-prompt detection flags; see Event Flags section |
-| `phase_files_touched` | dict[str, list[str]] | Files actually edited per phase (populated by `post_edit.py`) |
+| `phase_files_touched` | dict[str, list[str]] | Runtime-populated; not in INITIAL_STATE — set via `setdefault` per phase (populated by `post_edit.py`) |
 | `last_transition` | str \| null | ISO-8601 UTC timestamp of the most recent stage change |
-| `mode` | str | Execution mode (pending [ADR 0027](../../ADR/0027-mode-model-first-class.md) implementation; field not yet in INITIAL_STATE) |
+
+**Planned addition:** A `mode` field will be added in schema v3 per [ADR 0027](../../ADR/0027-mode-model-first-class.md) (multi-mode workflow). It will carry the active workflow mode (e.g., `"feature"`, `"bugfix"`); default `"feature"`.
 
 `State.load()` applies forward-compat auto-fill: any field present in `INITIAL_STATE` but missing from the on-disk JSON is filled with its default value before returning. This means adding a new field to `INITIAL_STATE` automatically handles older state files without requiring a schema migration, as long as the field's type and semantics are additive. Structural changes (renaming keys, changing value types) still require a versioned migration.
 
