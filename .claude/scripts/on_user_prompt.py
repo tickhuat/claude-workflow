@@ -38,12 +38,21 @@ def _print_adr_index() -> None:
     if not data:
         print("(empty)")
         return
-    for e in data:
+    # ADR 0025: filter to Accepted-only at injection time. _index.json stays
+    # complete; this filter is purely cosmetic for prompt injection cost.
+    accepted = [e for e in data if e.get("status") == "Accepted"]
+    hidden = [e for e in data if e.get("status") != "Accepted"]
+    for e in accepted:
         line = f"- {e.get('id', '?')} [{e.get('status', '?')}] {e.get('title', '')} → {e.get('file', '')}"
         summary = e.get("summary") or ""
         if summary:
             line += f" — {summary}"
         print(line)
+    if hidden:
+        from collections import Counter
+        counts = Counter((e.get("status") or "(no status)") for e in hidden)
+        breakdown = ", ".join(f"{n} {s}" for s, n in sorted(counts.items()))
+        print(f"({len(hidden)} ADRs hidden: {breakdown} — see ADR/ for full history)")
 
 
 def main() -> int:

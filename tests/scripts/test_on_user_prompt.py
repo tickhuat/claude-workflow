@@ -109,3 +109,74 @@ def test_on_user_prompt_respects_custom_keywords(tmp_project):
     if state_p.exists():
         import json as _j
         assert _j.loads(state_p.read_text())["event_flags"]["debug_required"] is True
+
+
+# --- ADR 0025: Accepted-only injection filter ---
+
+
+def test_filter_drops_superseded_and_shows_footer(tmp_project):
+    """Mixed input — only Accepted entries appear; footer summarizes hidden."""
+    (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
+        {"id": "0001", "title": "First", "status": "Accepted", "file": "0001-x.md", "summary": "S1."},
+        {"id": "0002", "title": "Second", "status": "Superseded", "file": "0002-y.md", "summary": "S2."},
+        {"id": "0003", "title": "Third", "status": "Accepted", "file": "0003-z.md", "summary": "S3."},
+    ]))
+    r = run_hook({"prompt": "hi"}, tmp_project)
+    assert r.returncode == 0, r.stderr
+    assert "0001" in r.stdout
+    assert "0003" in r.stdout
+    assert "0002" not in r.stdout, "Superseded ADR should NOT appear in body"
+    assert "Second" not in r.stdout, "Superseded title should NOT appear"
+    assert "(1 ADRs hidden: 1 Superseded — see ADR/ for full history)" in r.stdout
+
+
+def test_all_accepted_no_footer(tmp_project):
+    """No hidden entries — no footer line printed."""
+    (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
+        {"id": "0001", "title": "A", "status": "Accepted", "file": "0001-a.md", "summary": "."},
+        {"id": "0002", "title": "B", "status": "Accepted", "file": "0002-b.md", "summary": "."},
+    ]))
+    r = run_hook({"prompt": "hi"}, tmp_project)
+    assert r.returncode == 0, r.stderr
+    assert "ADRs hidden" not in r.stdout, "Footer should be absent when nothing is hidden"
+
+
+def test_all_superseded_empty_body_with_footer(tmp_project):
+    """All-hidden case — body has no entries; footer reports full count."""
+    (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
+        {"id": "0001", "title": "Old1", "status": "Superseded", "file": "0001-x.md", "summary": "."},
+        {"id": "0002", "title": "Old2", "status": "Superseded", "file": "0002-y.md", "summary": "."},
+    ]))
+    r = run_hook({"prompt": "hi"}, tmp_project)
+    assert r.returncode == 0, r.stderr
+    assert "0001" not in r.stdout
+    assert "0002" not in r.stdout
+    assert "(2 ADRs hidden: 2 Superseded — see ADR/ for full history)" in r.stdout
+
+
+def test_missing_status_labeled_no_status_in_footer(tmp_project):
+    """Entries with empty/missing status are filtered and labeled '(no status)'."""
+    (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
+        {"id": "0001", "title": "Good", "status": "Accepted", "file": "0001-a.md", "summary": "."},
+        {"id": "0002", "title": "Bad",  "status": "",         "file": "0002-b.md", "summary": "."},
+        {"id": "0003", "title": "Worse", "file": "0003-c.md", "summary": "."},
+    ]))
+    r = run_hook({"prompt": "hi"}, tmp_project)
+    assert r.returncode == 0, r.stderr
+    assert "0001" in r.stdout
+    assert "0002" not in r.stdout
+    assert "0003" not in r.stdout
+    assert "(2 ADRs hidden: 2 (no status) — see ADR/ for full history)" in r.stdout
+
+
+def test_footer_status_breakdown_alphabetical(tmp_project):
+    """Multi-status footer lists statuses alphabetically for deterministic output."""
+    (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
+        {"id": "0001", "title": "A", "status": "Accepted",   "file": "0001.md", "summary": "."},
+        {"id": "0002", "title": "B", "status": "Superseded", "file": "0002.md", "summary": "."},
+        {"id": "0003", "title": "C", "status": "Deprecated", "file": "0003.md", "summary": "."},
+        {"id": "0004", "title": "D", "status": "Superseded", "file": "0004.md", "summary": "."},
+    ]))
+    r = run_hook({"prompt": "hi"}, tmp_project)
+    assert r.returncode == 0, r.stderr
+    assert "(3 ADRs hidden: 1 Deprecated, 2 Superseded — see ADR/ for full history)" in r.stdout

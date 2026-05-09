@@ -166,5 +166,12 @@
     "status": "Accepted",
     "file": "0024-context-pressure-detection-deferred.md",
     "summary": "1."
+  },
+  {
+    "id": "0025",
+    "title": "ADR injection — Accepted-only filter (issue",
+    "status": "Accepted",
+    "file": "0025-adr-injection-accepted-only.md",
+    "summary": "In `_print_adr_index` only:"
   }
 ]
