@@ -24,7 +24,7 @@ The following table maps each hook event to its script and role. Event names and
 
 | Hook event | Script | Role |
 |---|---|---|
-| `UserPromptSubmit` | `on_user_prompt.py` | Injects the current ADR index and workflow state into the prompt context at the start of each user turn; also detects event-flag keywords (`bug`, `parallel`, `review`) and sets the corresponding flags in `dev-state.json`. |
+| `UserPromptSubmit` | `on_user_prompt.py` | Injects the current Doctrine index and workflow state into the prompt context at the start of each user turn; also detects event-flag keywords (`bug`, `parallel`, `review`) and sets the corresponding flags in `dev-state.json`. |
 | `PreToolUse:Skill` | `pre_skill.py` | Validates that the skill being invoked is permitted in the current stage. Strips the namespace prefix from `tool_input.skill` (see [ADR 0012](../../ADR/0012-strip-skill-namespace-prefix.md)) then checks `SKILL_TO_STAGE`; blocks with exit code 2 if the invocation is out of order. |
 | `PostToolUse:Skill` (matcher: `Skill\|Agent`) | `post_skill.py` | Advances state after a skill completes. Strips the namespace prefix, calls `next_stage_after_skill()`, records the skill in `skills_invoked`, clears any matching event flag via `SKILL_CLEARS_FLAG`, and detects `VERIFY-PASS phase=N` in the tool response to trigger phase auto-advance. |
 | `PreToolUse:Edit\|Write\|MultiEdit` | `pre_edit.py` | Checks target-file gating: the file path must either be in the plan's `target_files` globs, in the `global_whitelist`, or accompanied by a valid ADR reference for sensitive paths. Deviations of 1–2 extra files produce a warning; 3 or more block. |
@@ -77,7 +77,7 @@ Hooks should treat missing keys defensively (use `.get()` with defaults) because
 
 **Stdout** behaviour depends on hook event type:
 
-- `UserPromptSubmit`: output is **injected into the prompt** as additional context that Claude sees before generating a response. `on_user_prompt.py` uses this to prepend the current state summary and ADR index.
+- `UserPromptSubmit`: output is **injected into the prompt** as additional context that Claude sees before generating a response. `on_user_prompt.py` uses this to prepend the current state summary and Doctrine index.
 - `PreToolUse` / `PostToolUse`: output is shown to the user in the Claude Code UI as informational text.
 
 Hooks that have nothing to say should write nothing to stdout, or write only structured JSON when Claude Code expects a JSON response (check current Claude Code docs for event-specific stdout expectations; the hooks in this project emit plain text).

@@ -133,23 +133,13 @@ The motivation was a PyYAML 1.1 octal-parsing trap: bare numbers in YAML such as
 
 ---
 
-## ADR injection filter
+## Doctrine injection
 
-Per [ADR 0025](../../ADR/0025-adr-injection-accepted-only.md), `on_user_prompt.py` injects only ADRs with `status: Accepted` into the prompt system context. ADRs with any other status (such as `Superseded`, `Proposed`, or `Deprecated`) are excluded from injection.
+Per [ADR 0026](../../ADR/0026-switch-adrs-to-doctrine-docs.md), `on_user_prompt.py` injects doctrine documentation from `docs/doctrine/*.md` (not `ADR/_index.json`) into the prompt system context.
 
-The filter operates at injection time only. `_index.json` is always the complete set — `rebuild_index()` writes all non-template ADRs regardless of status. The filter is applied by `_print_adr_index` when building the prompt context:
+The source is enumerated by `list_doctrine()` from `lib/doctrine.py`, which scans `docs/doctrine/` for `.md` files and returns them in dependency order (files that are referenced by others are listed first). The injection builds a summary of framework rules and current system state at the start of each user turn.
 
-1. Partition `_index.json` entries into `accepted` (status exactly equals `"Accepted"`) and `hidden` (everything else).
-2. Print only `accepted` entries in the existing injection format.
-3. If any hidden entries exist, append a footer line of the form:
-   `(<N> ADRs hidden: <count> <status>[, <count> <status>]... — see ADR/ for full history)`
-   with status names sorted alphabetically. An empty or missing status field normalizes to the literal string `"(no status)"`.
-
-This footer preserves Claude's awareness that hidden ADRs exist and can be read on demand via the `Read` tool. Silent omission was rejected because it would prevent Claude from proactively referencing superseded decisions when a historical context question arose.
-
-The practical benefit is token reduction: Superseded ADRs are removed from every prompt's context. As the project accumulates ADRs over time and older ones are superseded, the savings grow monotonically.
-
-**Note for Phase 3 of the doctrine plan:** After Phase 3, the injection source switches from `ADR/_index.json` to `docs/doctrine/*.md`. The Accepted-only filter pattern established by ADR 0025 will carry over to the new source — only doctrine docs with an appropriate status field will be injected.
+Unlike ADRs (which have a `status` field used to filter at injection time), doctrine docs have no status field — they are the current, authoritative description of framework behavior and require no filtering. All doctrine files in `docs/doctrine/` are injected as-is.
 
 ---
 
