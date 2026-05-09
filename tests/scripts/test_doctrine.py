@@ -192,3 +192,20 @@ def test_first_paragraph_returns_empty_when_only_headings():
 def test_first_paragraph_unchanged_for_prose_first():
     fp = _import_first_paragraph()
     assert fp("Intro prose.\n\n## Section") == "Intro prose."
+
+
+# ---- structural: intro prose required (issue #19) ----
+
+@pytest.mark.parametrize(("filename", "expected_adrs"), EXPECTED_DOCTRINE)
+def test_doctrine_doc_has_intro_prose(filename: str, expected_adrs: list[str]) -> None:
+    """Each doctrine doc must have a non-heading paragraph between frontmatter
+    and the first ## heading. Required so doctrine-index injection surfaces
+    an informative summary line.
+    """
+    _, body = _parse_doctrine(DOCTRINE_DIR / filename)
+    fp = _import_first_paragraph()
+    summary = fp(body)
+    assert summary, f"{filename}: no intro prose (first_paragraph is empty)"
+    assert not summary.startswith("#"), (
+        f"{filename}: first paragraph is a heading: {summary!r}"
+    )
