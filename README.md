@@ -248,6 +248,46 @@ Why: the `live-verification` skill uses this list to decide whether a PR
 needs end-to-end verification before merge. Stale list → silent
 false-negatives (the failure mode that ADR 0024 documents).
 
+## Versioning
+
+`claude-workflow` follows [Semantic Versioning](https://semver.org/) per
+[ADR 0029](ADR/0029-version-policy-semver.md). Per-release notes live in
+[CHANGELOG.md](CHANGELOG.md).
+
+**Pre-1.0 (current).** Breaking changes bump MINOR — `0.4.0` → `0.5.0`
+indicates a breaking change. PATCH (`0.4.0` → `0.4.1`) is reserved for
+non-breaking fixes. This convention is the SemVer-permitted "anything
+goes" interpretation of the 0.x range, made explicit so maintainers can
+decide on each PR whether to bump.
+
+**Post-1.0 (future).** Breaking changes bump MAJOR and require a
+migration ADR.
+
+### What counts as breaking
+
+- The hook stdin / stdout / exit-code contract, including entry-point
+  names (`python -m claude_workflow.hooks.<name>`).
+- Stable fields of the `dev-state.json` schema. Adding a new
+  `schema_version` migration is **not** breaking — that mechanism is
+  itself backwards-compatible.
+- Stable keys of `dev-rules.config.yaml` (the keys flagged "Stable" in
+  [ADR 0030 §5](ADR/0030-distribution-pypi-architecture.md)). Adding a
+  new stable key is non-breaking; renaming or removing one is breaking.
+- The `init-fresh.sh` CLI contract (supported flags and exit codes).
+
+### What is *not* breaking
+
+- Adding a new workflow mode (e.g. a future `chore` or `hotfix` mode).
+- Adding a new doctrine doc under `docs/doctrine/`.
+- Internal refactoring inside `src/claude_workflow/**/*.py` that does
+  not change the hook contract or stable schema.
+- Adding a new hook that does not modify the behaviour of existing
+  hooks.
+- Adding a new stable schema field in a backwards-compatible way.
+
+For the full rationale and rejected alternatives, see
+[`docs/doctrine/distribution-and-versioning.md`](docs/doctrine/distribution-and-versioning.md).
+
 ## License
 
 [MIT](LICENSE).
