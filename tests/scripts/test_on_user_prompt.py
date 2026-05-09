@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 HOOK = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "on_user_prompt.py"
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def run_hook(event: dict, cwd: Path):
@@ -180,3 +181,51 @@ def test_footer_status_breakdown_alphabetical(tmp_project):
     r = run_hook({"prompt": "hi"}, tmp_project)
     assert r.returncode == 0, r.stderr
     assert "(3 ADRs hidden: 1 Deprecated, 2 Superseded — see ADR/ for full history)" in r.stdout
+
+
+# --- ADR 0026: Doctrine injection rewiring ---
+
+
+def test_print_doctrine_index_outputs_doctrine_titles(
+    tmp_path, monkeypatch, capsys
+):
+    """Per ADR 0026: prompt injection reads docs/doctrine/, not ADR/."""
+    d = tmp_path / "docs" / "doctrine"
+    d.mkdir(parents=True)
+    (d / "state-machine.md").write_text(
+        "---\ntitle: State machine\nlast_updated: 2026-05-09\n---\n\n"
+        "The state machine guards the dev flow.\n"
+    )
+    monkeypatch.setattr("lib.state.project_root", lambda: tmp_path)
+
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+    # force re-import to pick up monkeypatched project_root
+    for mod in list(sys.modules):
+        if mod.startswith("lib.") or mod == "on_user_prompt":
+            del sys.modules[mod]
+    import on_user_prompt
+
+    on_user_prompt._print_doctrine_index()
+
+    captured = capsys.readouterr()
+    assert "Doctrine Index" in captured.out
+    assert "State machine" in captured.out
+    assert "The state machine guards the dev flow." in captured.out
+
+
+def test_print_doctrine_index_handles_missing_dir(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr("lib.state.project_root", lambda: tmp_path)
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+    for mod in list(sys.modules):
+        if mod.startswith("lib.") or mod == "on_user_prompt":
+            del sys.modules[mod]
+    import on_user_prompt
+
+    on_user_prompt._print_doctrine_index()
+    captured = capsys.readouterr()
+    assert "Doctrine Index" in captured.out
+    assert "(empty)" in captured.out
