@@ -51,3 +51,23 @@ def test_templates_settings_matches_live() -> None:
     live = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text())
     tpl = json.loads((TPL / "settings.json").read_text())
     assert live == tpl, "templates/.claude/settings.json drifted from .claude/settings.json"
+
+
+def test_templates_dev_rules_yaml_matches_live() -> None:
+    """templates/.claude/dev-rules.config.yaml equals the live copy."""
+    live = (REPO_ROOT / ".claude" / "dev-rules.config.yaml").read_text()
+    tpl = (TPL / "dev-rules.config.yaml").read_text()
+    assert live == tpl, (
+        "templates/.claude/dev-rules.config.yaml drifted from "
+        ".claude/dev-rules.config.yaml"
+    )
+
+
+def test_templates_notify_sh_matches_live() -> None:
+    """templates/.claude/scripts/notify.sh equals the live copy."""
+    live = (REPO_ROOT / ".claude" / "scripts" / "notify.sh").read_text()
+    tpl = (TPL / "scripts" / "notify.sh").read_text()
+    assert live == tpl, (
+        "templates/.claude/scripts/notify.sh drifted from "
+        ".claude/scripts/notify.sh"
+    )

@@ -102,3 +102,17 @@ extension API 的本質就是「distribution boundary 的合約」— stable sur
   - Phase 2 落地（package 重構、entry point 改名、init-fresh 升級）
   - 第一個 external user 出現時開新 ADR 評估 PyPI 發布
   - 未來考慮加 `claude-workflow upgrade` CLI 簡化升級流程（不在本輪）
+
+## Addendum (2026-05-09): `lib/runtime_paths.py` retained, not deleted
+
+Phase 2 implementation deviated from §1's "順便清掉 `lib/runtime_paths.py`" wording. The original rationale ("import 路徑乾淨") fits an import-path-resolution helper, but the actual `runtime_paths.py` content is the **glob-list applicability gate** for the `live-verification` skill (`.claude/skills/live-verification/SKILL.md` Step 1 invokes it). That gate is still load-bearing post-refactor — it tells live-verification when to self-skip vs. run.
+
+Phase 2 therefore moved the file to `src/claude_workflow/lib/runtime_paths.py` and updated `RUNTIME_TRIGGER_GLOBS` to include `src/claude_workflow/**` and `templates/.claude/**` (the new runtime-touching surfaces), removing the retired `.claude/scripts/**` entry. Live-verification's `SKILL.md` updated to invoke `.venv/bin/python -m claude_workflow.lib.runtime_paths` accordingly.
+
+The `Positive: lib/runtime_paths.py 可整支移除` bullet above remains historically accurate as the **stated intent**, but is superseded by this addendum as the **as-shipped behaviour**.
+
+## Addendum (2026-05-09): hook interpreter pinned to `.venv/bin/python`
+
+`.claude/settings.json` invokes Python hooks as `.venv/bin/python -m claude_workflow.hooks.<name>`, not the §2 `python -m ...` form. Reason: PEP 668 + macOS realities. On a default macOS install, `python3` resolves to `/usr/bin/python3` (Python 3.9), which is below the `requires-python = ">=3.10"` floor and lacks the package even when `pip install -e .` succeeded against the user's other Python. PostToolUse hook errors are silent in Claude Code, so the failure manifests as the state machine appearing dead — discovered during Phase 2 dogfood.
+
+Pinning to `.venv/bin/python` makes the resolved interpreter explicit and matches PEP 668's "use a venv" expectation. `scripts/init-fresh.sh` creates the venv automatically as part of the scaffold step, so fork users get a working setup out of the box. The `.venv/bin/python` prefix is therefore part of the stable hook entry-point contract (already noted in the Extension API table; this addendum documents the rationale).

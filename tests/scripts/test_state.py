@@ -7,12 +7,12 @@ import pytest
 from claude_workflow.lib.state import State, StateError, INITIAL_STATE
 
 
-def _scripts_dir():
-    """Return the installed claude_workflow package directory.
+def _package_parent_dir():
+    """Return the directory CONTAINING the claude_workflow package.
 
-    Used by subprocess tests that need PYTHONPATH set to a parent dir.
-    Returns the directory CONTAINING the claude_workflow package
-    (so PYTHONPATH=<this> lets `import claude_workflow` work).
+    Used by subprocess tests that need PYTHONPATH set so `import claude_workflow`
+    succeeds in a child process. With the editable install (ADR 0030 src layout),
+    this resolves to `<repo>/src/`.
     """
     import claude_workflow
     return Path(claude_workflow.__file__).resolve().parent.parent
@@ -475,7 +475,7 @@ def test_concurrent_v2_migration_only_one_info(tmp_project):
     # let stderr through so caller can capture INFO.
     loader_script = textwrap.dedent(f"""
         import sys
-        sys.path.insert(0, {str(_scripts_dir()) !r})
+        sys.path.insert(0, {str(_package_parent_dir()) !r})
         from claude_workflow.lib.state import State
         s = State.load()
         print(s.data["schema_version"])

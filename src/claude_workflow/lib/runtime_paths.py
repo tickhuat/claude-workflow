@@ -28,6 +28,9 @@ RUNTIME_TRIGGER_GLOBS: tuple[str, ...] = (
     ".claude/settings.json",
     ".claude/settings.local.json",
     ".claude/hooks/**",
+    # pyproject.toml: dependencies/optional-deps changes can break hook
+    # imports at runtime (silent ModuleNotFoundError in PostToolUse).
+    "pyproject.toml",
 )
 
 

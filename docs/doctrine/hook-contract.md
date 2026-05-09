@@ -22,19 +22,19 @@ The combined hook + state machine architecture was established in [ADR 0001](../
 
 ## Hook list
 
-The following table maps each hook event to its script and role. Event names and script paths match the wiring in `.claude/settings.json` exactly.
+The following table maps each hook event to its module and role. Event names and module paths match the wiring in `.claude/settings.json` exactly: every Python hook is invoked as `.venv/bin/python -m claude_workflow.hooks.<module>` (see [ADR 0030](../../ADR/0030-distribution-pypi-architecture.md)).
 
-| Hook event | Script | Role |
+| Hook event | Module | Role |
 |---|---|---|
-| `UserPromptSubmit` | `on_user_prompt.py` | Injects the current Doctrine index and workflow state into the prompt context at the start of each user turn; also detects event-flag keywords (`bug`, `parallel`, `review`) and sets the corresponding flags in `dev-state.json`. |
-| `PreToolUse:Skill` | `pre_skill.py` | Validates that the skill being invoked is permitted in the current stage. Strips the namespace prefix from `tool_input.skill` (see [ADR 0012](../../ADR/0012-strip-skill-namespace-prefix.md)) then checks `SKILL_TO_STAGE`; blocks with exit code 2 if the invocation is out of order. |
-| `PostToolUse:Skill` (matcher: `Skill\|Agent`) | `post_skill.py` | Advances state after a skill completes. Strips the namespace prefix, calls `next_stage_after_skill()`, records the skill in `skills_invoked`, clears any matching event flag via `SKILL_CLEARS_FLAG`, and detects `VERIFY-PASS phase=N` in the tool response to trigger phase auto-advance. |
-| `PreToolUse:Edit\|Write\|MultiEdit` | `pre_edit.py` | Checks target-file gating: the file path must either be in the plan's `target_files` globs, in the `global_whitelist`, or accompanied by a valid ADR reference for sensitive paths. Deviations of 1–2 extra files produce a warning; 3 or more block. |
-| `PreToolUse:Bash` | `pre_bash.py` | Checks git-push gating (blocks `git push` when `state.last_commit_violation` is set) and performs best-effort early detection of commit-message deviations via regex. Also enforces any other Bash-level guards (e.g. sensitive path detection in arguments). |
-| `PostToolUse:Bash` | `post_bash.py` | Ground-truth commit message verification, per [ADR 0005](../../ADR/0005-post-bash-commit-groundtruth.md). Detects when the completed Bash command was a `git commit` with exit code 0, fetches the actual written message via `git log -1 --format=%B HEAD`, and checks deviation-note compliance. On violation, sets `state.last_commit_violation`; clears it when an amend passes. |
-| `PostToolUse:Read` | `post_read.py` | Detects when the Read tool accessed a path under `ADR/`, extracts the ADR slug, and appends it to `state.adrs_read` (deduplicated list), per [ADR 0004](../../ADR/0004-post-read-adr-tracking.md). This is the ground-truth signal that the user has actually read an ADR — the pre-skill gate compares `adrs_read` against the ADR slugs listed in the spec/plan frontmatter before allowing `brainstorming` or `writing-plans` to proceed. |
+| `UserPromptSubmit` | `claude_workflow.hooks.on_user_prompt` | Injects the current Doctrine index and workflow state into the prompt context at the start of each user turn; also detects event-flag keywords (`bug`, `parallel`, `review`) and sets the corresponding flags in `dev-state.json`. |
+| `PreToolUse:Skill` | `claude_workflow.hooks.pre_skill` | Validates that the skill being invoked is permitted in the current stage. Strips the namespace prefix from `tool_input.skill` (see [ADR 0012](../../ADR/0012-strip-skill-namespace-prefix.md)) then checks `SKILL_TO_STAGE`; blocks with exit code 2 if the invocation is out of order. |
+| `PostToolUse:Skill` (matcher: `Skill\|Agent`) | `claude_workflow.hooks.post_skill` | Advances state after a skill completes. Strips the namespace prefix, calls `next_stage_after_skill()`, records the skill in `skills_invoked`, clears any matching event flag via `SKILL_CLEARS_FLAG`, and detects `VERIFY-PASS phase=N` in the tool response to trigger phase auto-advance. |
+| `PreToolUse:Edit\|Write\|MultiEdit` | `claude_workflow.hooks.pre_edit` | Checks target-file gating: the file path must either be in the plan's `target_files` globs, in the `global_whitelist`, or accompanied by a valid ADR reference for sensitive paths. Deviations of 1–2 extra files produce a warning; 3 or more block. |
+| `PreToolUse:Bash` | `claude_workflow.hooks.pre_bash` | Checks git-push gating (blocks `git push` when `state.last_commit_violation` is set) and performs best-effort early detection of commit-message deviations via regex. Also enforces any other Bash-level guards (e.g. sensitive path detection in arguments). |
+| `PostToolUse:Bash` | `claude_workflow.hooks.post_bash` | Ground-truth commit message verification, per [ADR 0005](../../ADR/0005-post-bash-commit-groundtruth.md). Detects when the completed Bash command was a `git commit` with exit code 0, fetches the actual written message via `git log -1 --format=%B HEAD`, and checks deviation-note compliance. On violation, sets `state.last_commit_violation`; clears it when an amend passes. |
+| `PostToolUse:Read` | `claude_workflow.hooks.post_read` | Detects when the Read tool accessed a path under `ADR/`, extracts the ADR slug, and appends it to `state.adrs_read` (deduplicated list), per [ADR 0004](../../ADR/0004-post-read-adr-tracking.md). This is the ground-truth signal that the user has actually read an ADR — the pre-skill gate compares `adrs_read` against the ADR slugs listed in the spec/plan frontmatter before allowing `brainstorming` or `writing-plans` to proceed. |
 
-Note: `.claude/settings.json` also wires `PostToolUse:Edit|Write|MultiEdit` to `post_edit.py` (records touched files per phase) and `Stop`/`SubagentStop`/`Notification` to `notify.sh` (macOS notifications). These are supporting hooks and are not part of the enforcement contract described here.
+Note: `.claude/settings.json` also wires `PostToolUse:Edit|Write|MultiEdit` to `claude_workflow.hooks.post_edit` (records touched files per phase) and `Stop`/`SubagentStop`/`Notification` to `bash .claude/scripts/notify.sh` (macOS/Linux notifications — kept as a bash script per ADR 0030). These are supporting hooks and are not part of the enforcement contract described here.
 
 ---
 
@@ -135,8 +135,8 @@ The hook stdin/stdout/exit-code contract described in this document is part of t
 
 - The JSON field names consumed from stdin (`tool_input`, `tool_response`, `prompt`).
 - The exit code semantics (`0` = proceed, `2` = block).
-- The hook entry-point invocation style (`python3 .claude/scripts/<hook>.py`).
-- The wiring keys in `.claude/settings.json` (event → script mapping).
+- The hook entry-point invocation style (`.venv/bin/python -m claude_workflow.hooks.<name>`), per [ADR 0030](../../ADR/0030-distribution-pypi-architecture.md). The `.venv/bin/python` prefix is part of the contract: it pins the interpreter that has the package installed (system `python3` on macOS may be too old, see commit history).
+- The wiring keys in `.claude/settings.json` (event → module mapping).
 
 These are stable because Claude Code itself relies on them and because ADRs require an explicit decision to change them. Stability was affirmed as part of the Round 4 post-audit consolidation (ADR 0030).
 

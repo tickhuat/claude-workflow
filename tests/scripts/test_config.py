@@ -78,8 +78,6 @@ def test_defaults_match_shipped_yaml():
 
     # Re-import DEFAULTS fresh (avoid the module-level _CACHE)
     import importlib
-    import sys
-    sys.path.insert(0, str(repo_root / ".claude" / "scripts"))
     from claude_workflow.lib import config as config_module
     importlib.reload(config_module)
     from claude_workflow.lib.config import DEFAULTS

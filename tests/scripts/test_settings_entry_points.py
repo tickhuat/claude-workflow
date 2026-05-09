@@ -15,12 +15,14 @@ import json
 import re
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"
+VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
 
 # Match `.venv/bin/python -m claude_workflow.hooks.<word>` allowing optional
 # extra flags between `python` and `-m`.
@@ -105,21 +107,26 @@ def test_each_python_hook_present(expected_module: str) -> None:
 # stdin and asserts a healthy exit code — this is the safety net that catches
 # any future regression where settings.json points at an interpreter that
 # can't load the package.
-def _venv_python_exists() -> bool:
-    return (REPO_ROOT / ".venv" / "bin" / "python").exists()
+#
+# Environment substitution: when `.venv/bin/python` is missing (typical CI
+# layouts that install into the system Python instead), substitute the leading
+# `.venv/bin/python` with `sys.executable` — the pytest interpreter, which
+# always has the package because pytest itself is running there. The test
+# still exercises the rest of the command verbatim (module path, args).
+def _resolve_command(cmd: str) -> list[str]:
+    argv = shlex.split(cmd)
+    if argv and argv[0] == ".venv/bin/python" and not VENV_PYTHON.exists():
+        argv[0] = sys.executable
+    return argv
 
 
-@pytest.mark.skipif(
-    not _venv_python_exists(),
-    reason=".venv/bin/python missing — run `python3.12 -m venv .venv && .venv/bin/pip install -e .`",
-)
 def test_each_hook_command_actually_runs() -> None:
     settings = json.loads(SETTINGS_PATH.read_text())
     failures: list[str] = []
     for event, cmd in _hook_commands(settings):
         if cmd.lstrip().startswith("bash"):
             continue
-        argv = shlex.split(cmd)
+        argv = _resolve_command(cmd)
         proc = subprocess.run(
             argv,
             input="{}",
@@ -131,8 +138,8 @@ def test_each_hook_command_actually_runs() -> None:
         # 0 = success/no-op, 2 = BLOCK (hook ran but denied) — both healthy.
         if proc.returncode not in (0, 2):
             failures.append(
-                f"{event} (cmd={cmd!r}) rc={proc.returncode} "
-                f"stderr={proc.stderr[:200]!r}"
+                f"{event} (cmd={cmd!r}, resolved argv={argv!r}) "
+                f"rc={proc.returncode} stderr={proc.stderr[:200]!r}"
             )
     assert not failures, (
         "settings.json hook commands fail when run literally:\n"

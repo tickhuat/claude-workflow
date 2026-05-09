@@ -79,6 +79,7 @@ class TestIsRuntimeTouching:
             ".claude/settings.json",
             ".claude/settings.local.json",
             ".claude/hooks/**",
+            "pyproject.toml",
         }
         actual = set(RUNTIME_TRIGGER_GLOBS)
         missing = required - actual

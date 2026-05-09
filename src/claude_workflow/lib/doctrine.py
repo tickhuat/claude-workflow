@@ -9,6 +9,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+# Use module-form import (not `from .state import project_root`) so test
+# code can monkeypatch `claude_workflow.lib.state.project_root` and have
+# the patch take effect here at call time. The symbol-form would bind a
+# stale reference at import time and break `tmp_path`-based fixtures in
+# tests/scripts/test_doctrine.py.
 import claude_workflow.lib.state
 from claude_workflow.lib.frontmatter import parse, FrontmatterError
 
