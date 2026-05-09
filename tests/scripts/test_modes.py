@@ -168,6 +168,9 @@ def test_current_mode_config_uses_in_code_fallback_when_yaml_missing_feature(tmp
     # accepting any ModeConfig that happens to be named "feature", regardless
     # of whether the in-code fallback path was actually exercised.
     assert mc is _FALLBACK_FEATURE
+    err = capsys.readouterr().err
+    assert "[WARN by dev-rules]" in err
+    assert "feature" in err and "built-in fallback" in err
 
 
 def test_fallback_feature_matches_defaults():

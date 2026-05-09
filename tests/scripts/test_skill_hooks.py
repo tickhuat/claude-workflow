@@ -461,6 +461,30 @@ def test_pre_skill_passes_when_target_in_mode_required_stages(tmp_project):
     assert proc.returncode == 0, f"expected PASS, got rc={proc.returncode}, stderr={proc.stderr}"
 
 
+def test_pre_skill_blocks_on_corrupt_state_for_non_gated_skill(tmp_project):
+    """Phase 3 broadened the State.load surface: corrupt state now blocks ALL
+    skills with a SKILL_TO_STAGE transition, not just gated ones (was: only
+    brainstorming + writing-plans). This documents and protects that broadened
+    behaviour with a non-gated skill (using-superpowers).
+    """
+    import json
+    import os
+    import subprocess
+    import sys
+    state_path = tmp_project / ".claude" / "dev-state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text("not valid json {")
+    event = {"tool_name": "Skill", "tool_input": {"skill": "using-superpowers"}}
+    proc = subprocess.run(
+        [sys.executable, "-m", "claude_workflow.hooks.pre_skill"],
+        input=json.dumps(event), capture_output=True, text=True, cwd=tmp_project,
+        env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
+    )
+    assert proc.returncode == 2, f"expected BLOCK, got rc={proc.returncode}, stderr={proc.stderr}"
+    assert "[BLOCKED by dev-rules]" in proc.stderr
+    assert "dev-state.json" in proc.stderr
+
+
 def test_post_skill_auto_advance_does_not_overflow_phases_total(tmp_project, set_stage):
     """Edge case: phases_verified is gappy and current_phase=N, but n+1 > phases_total.
     Without the guard, current_phase would become n+1 (out of bounds)."""

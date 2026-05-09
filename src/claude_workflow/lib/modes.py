@@ -166,7 +166,11 @@ def current_mode_config(state: "State") -> ModeConfig:
     - state.mode missing → treat as DEFAULT_MODE silently (feature is the safe default).
     - state.mode set, mode found in registry → return it.
     - state.mode set, mode NOT found → fall back to feature + stderr WARN.
-    - Even feature missing → return _FALLBACK_FEATURE (last-ditch defence).
+    - Even feature missing from registry → return _FALLBACK_FEATURE (last-ditch
+      defence) and emit a stderr WARN — this happens only when a fork user has
+      deleted the feature record from YAML AND the DEFAULTS-yaml consistency
+      test failed to catch it; surfacing it loudly prevents silent reliance on
+      the in-code default.
     """
     name = state.data.get("mode") or DEFAULT_MODE
     registry = ModeRegistry.from_config()
@@ -179,4 +183,12 @@ def current_mode_config(state: "State") -> ModeConfig:
             f"falling back to {DEFAULT_MODE!r}.",
             file=sys.stderr,
         )
-    return registry.get(DEFAULT_MODE) or _FALLBACK_FEATURE
+    fallback = registry.get(DEFAULT_MODE)
+    if fallback is None:
+        print(
+            f"[WARN by dev-rules] {DEFAULT_MODE!r} mode missing from config; "
+            "using built-in fallback (gating runs with framework defaults).",
+            file=sys.stderr,
+        )
+        return _FALLBACK_FEATURE
+    return fallback
