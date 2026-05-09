@@ -104,3 +104,36 @@ def test_init_fresh_preserves_pytest_after(tmp_path):
     # Key check: lib imports work, no collection errors.
     assert "ImportError" not in r.stdout + r.stderr
     assert "ModuleNotFoundError" not in r.stdout + r.stderr
+
+
+def test_init_fresh_removes_adr_readme(tmp_path):
+    """Per ADR 0026: ADR/README.md is maintainer-only freeze notice;
+    fork users should not see it."""
+    _seed_repo(tmp_path)
+    (tmp_path / "ADR" / "README.md").write_text("# Frozen bucket\n")
+    r = subprocess.run(
+        ["bash", "scripts/init-fresh.sh"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert r.returncode == 0, f"script failed: {r.stderr}"
+    assert not (tmp_path / "ADR" / "README.md").exists()
+
+
+def test_init_fresh_preserves_docs_doctrine(tmp_path):
+    """docs/doctrine/ is framework content; fork users keep it."""
+    _seed_repo(tmp_path)
+    d = tmp_path / "docs" / "doctrine"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "state-machine.md").write_text(
+        "---\ntitle: State machine\nlast_updated: 2026-05-09\n---\n\nbody\n"
+    )
+    r = subprocess.run(
+        ["bash", "scripts/init-fresh.sh"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert r.returncode == 0, f"script failed: {r.stderr}"
+    assert (d / "state-machine.md").exists()
