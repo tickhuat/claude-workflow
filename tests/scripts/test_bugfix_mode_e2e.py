@@ -26,6 +26,7 @@ import pytest
 
 PRE = "claude_workflow.hooks.pre_skill"
 POST = "claude_workflow.hooks.post_skill"
+PRE_EDIT = "claude_workflow.hooks.pre_edit"
 
 
 def _run(hook: str, event: dict, cwd: Path):
@@ -123,3 +124,112 @@ def test_bugfix_ceremony_reduction(set_stage):
     assert "spec-ready" in bypassed
     assert "plan-ready" in bypassed
     assert "all-phases-verified" in bypassed
+
+
+def test_bugfix_mode_pre_edit_allows_unlimited_src_edits(set_stage):
+    """Cascade audit C-1 fix: in bugfix mode (require_plan=false), pre_edit
+    must NOT count src/ edits as deviations. Without the fix, the third
+    distinct src/ edit triggers `[BLOCKED by dev-rules] phase 0 累計 3 個
+    plan 外檔案，需新 ADR.` because _current_phase_targets returns [] when
+    current_plan is null and matches_any treats all paths as outside-plan.
+
+    Cascade audit C-2 fix: e2e test exercises pre_edit (not just
+    pre_skill / post_skill) so this category of bug is surfaced."""
+    cwd = Path.cwd()
+    set_stage(stage="exec-running", mode="bugfix")
+
+    # Three distinct src/ paths — files don't need to actually exist for
+    # pre_edit to evaluate them (resolve() works on non-existent paths).
+    src_paths = [
+        cwd / "src" / "claude_workflow" / "lib" / "foo.py",
+        cwd / "src" / "claude_workflow" / "lib" / "bar.py",
+        cwd / "src" / "claude_workflow" / "lib" / "baz.py",
+    ]
+
+    for p in src_paths:
+        evt = {"tool_name": "Edit", "tool_input": {"file_path": str(p)}}
+        r = subprocess.run(
+            [sys.executable, "-m", PRE_EDIT],
+            input=json.dumps(evt),
+            capture_output=True, text=True, cwd=cwd,
+            env={"CLAUDE_PROJECT_DIR": str(cwd), "PATH": "/usr/bin:/bin"},
+        )
+        assert r.returncode == 0, (
+            f"bugfix mode unexpectedly blocked pre_edit on {p.name!r}: "
+            f"stderr={r.stderr!r}"
+        )
+
+    # Sanity: deviation_log should still be empty (the short-circuit returns
+    # before _handle_deviation could append).
+    state = json.loads((cwd / ".claude" / "dev-state.json").read_text())
+    assert state["deviation_log"] == [], (
+        f"bugfix mode should not log deviations; got {state['deviation_log']}"
+    )
+
+
+def test_switch_mode_bugfix_resets_stale_phase_fields(set_stage):
+    """Cascade audit I-3 fix: when switching from done(feature) with a
+    completed plan in state, switch-mode-bugfix must reset
+    current_spec/current_plan/current_phase/phases_total/phases_verified
+    so the new bugfix cycle doesn't read stale plan data."""
+    cwd = Path.cwd()
+    set_stage(
+        stage="done",
+        mode="feature",
+        current_spec="docs/superpowers/specs/old.md",
+        current_plan="docs/superpowers/plans/old.md",
+        current_phase=3,
+        phases_total=3,
+        phases_verified=[1, 2, 3],
+    )
+
+    pre = _run(PRE, _skill_event("switch-mode-bugfix"), cwd)
+    assert pre.returncode == 0, f"pre_skill blocked: {pre.stderr}"
+    post = _run(POST, _skill_event("switch-mode-bugfix"), cwd)
+    assert post.returncode == 0, f"post_skill errored: {post.stderr}"
+
+    s = _state(cwd)
+    assert s["mode"] == "bugfix"
+    assert s["stage"] == "exec-running"
+    # Cycle-boundary reset:
+    assert s["current_spec"] is None, f"current_spec not reset: {s['current_spec']!r}"
+    assert s["current_plan"] is None, f"current_plan not reset: {s['current_plan']!r}"
+    assert s["current_phase"] == 0, f"current_phase not reset: {s['current_phase']}"
+    assert s["phases_total"] == 0, f"phases_total not reset: {s['phases_total']}"
+    assert s["phases_verified"] == [], f"phases_verified not reset: {s['phases_verified']}"
+
+
+def test_feature_mode_blocks_exec_running_to_reviewed_skip(set_stage):
+    """Cascade audit I-4 fix: feature mode (require_phase_verify=True) must
+    NOT allow Skill(requesting-code-review) from exec-running to skip
+    all-phases-verified. The new exec-running -> reviewed mapping was added
+    for bugfix mode; feature users taking that path would bypass per-phase
+    verification entirely. The consecutive-stages gate in pre_skill rejects
+    this transition."""
+    cwd = Path.cwd()
+    # Feature mode at exec-running with phases not yet verified.
+    set_stage(
+        stage="exec-running",
+        mode="feature",
+        current_phase=1,
+        phases_total=3,
+        phases_verified=[],
+    )
+
+    r = _run(PRE, _skill_event("requesting-code-review"), cwd)
+    assert r.returncode == 2, (
+        f"feature-mode skip-phase-verify loophole still open: rc={r.returncode}"
+    )
+    assert "phase 驗證" in r.stderr or "require_phase_verify" in r.stderr.lower() or "跳過" in r.stderr, (
+        f"block message should mention phase verification: stderr={r.stderr!r}"
+    )
+
+    # Bugfix mode at the same stages must still be allowed (require_phase_verify=False).
+    set_stage(
+        stage="exec-running",
+        mode="bugfix",
+    )
+    r = _run(PRE, _skill_event("requesting-code-review"), cwd)
+    assert r.returncode == 0, (
+        f"bugfix mode wrongly blocked from exec-running -> reviewed: {r.stderr}"
+    )

@@ -101,6 +101,16 @@ def _try_transition(state: State, skill: str) -> None:
     # switch-mode-bugfix and executing-plans land at exec-running).
     if skill in MODE_SWITCH_SKILLS:
         state.data["mode"] = MODE_SWITCH_SKILLS[skill]
+        # Cascade audit I-3: a mode switch crosses a cycle boundary
+        # (only valid from idle/done — see SKILL_TO_STAGE for switch-mode-*).
+        # Reset plan/phase/spec fields so the new cycle starts clean and
+        # downstream hooks (pre_edit's _current_phase_targets, post_skill's
+        # auto-advance) don't read stale data from the previous cycle.
+        state.data["current_spec"] = None
+        state.data["current_plan"] = None
+        state.data["current_phase"] = 0
+        state.data["phases_total"] = 0
+        state.data["phases_verified"] = []
     state.set_stage(target)
 
 

@@ -58,13 +58,15 @@ SKILL_TO_STAGE = {
     "subagent-driven-development":    {"plan-ready": "exec-running",
                                        "exec-prep": "exec-running"},
     "requesting-code-review":         {"all-phases-verified": "reviewed",
-                                       "exec-running": "reviewed"},
+                                       "exec-running": "reviewed"},  # bugfix-mode path
     "finishing-a-development-branch": {"reviewed": "done"},
     # Mode-switching skills (ADR 0028); see docs/doctrine/mode-model.md.
+    # These bypass the active mode's required_stages gate in pre_skill.py
+    # because their target belongs to a *different* mode's flow.
     "switch-mode-bugfix":             {"idle": "exec-running",
-                                       "done": "exec-running"},
+                                       "done": "exec-running"},     # → mode=bugfix
     "switch-mode-feature":            {"idle": "session-started",
-                                       "done": "session-started"},
+                                       "done": "session-started"},  # → mode=feature
 }
 ```
 

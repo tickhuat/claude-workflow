@@ -130,3 +130,19 @@ def test_requesting_code_review_still_supports_all_phases_verified():
     """Feature mode: requesting-code-review still maps all-phases-verified -> reviewed."""
     from claude_workflow.lib.skills import next_stage_after_skill
     assert next_stage_after_skill("requesting-code-review", "all-phases-verified") == "reviewed"
+
+
+def test_mode_switch_skills_have_only_idle_and_done_source_stages():
+    """ADR 0028 mid-flow lock (M-A cascade-audit minor): the SKILL_TO_STAGE
+    entries for switch-mode-* skills must list ONLY {idle, done} as source
+    stages. Any other source would silently break mid-flow protection — a
+    contributor adding `"switch-mode-foo": {"spec-ready": "..."}` would
+    pass the existing alignment test but break the lock invariant."""
+    from claude_workflow.lib.skills import MODE_SWITCH_SKILLS, SKILL_TO_STAGE
+    expected_sources = {"idle", "done"}
+    for skill in MODE_SWITCH_SKILLS:
+        sources = set(SKILL_TO_STAGE[skill].keys())
+        assert sources == expected_sources, (
+            f"{skill!r} has source stages {sources}; mid-flow lock requires "
+            f"exactly {expected_sources}"
+        )

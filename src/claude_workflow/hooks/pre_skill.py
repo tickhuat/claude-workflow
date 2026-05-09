@@ -126,6 +126,31 @@ def main() -> int:
                 actions=[f"確認 mode 對應的 stage 順序，或更換 skill"],
             ), file=sys.stderr)
             return 2
+        # Cascade audit I-4: when the active mode requires per-phase
+        # verification, transitions must be CONSECUTIVE in required_stages
+        # (no skipping intermediate stages). Without this, the new
+        # `requesting-code-review[exec-running]: reviewed` mapping (added
+        # for bugfix mode) lets feature-mode users skip
+        # `all-phases-verified` and bypass phase verification entirely.
+        # bugfix mode (require_phase_verify=False) is naturally exempt.
+        if (
+            cur in rs
+            and mc.require_phase_verify
+            and rs.index(target) > rs.index(cur) + 1
+        ):
+            skipped = rs[rs.index(cur) + 1: rs.index(target)]
+            print(format_block(
+                problem=(
+                    f"mode={mc.name!r} 要求 phase 驗證: stage {cur!r} → {target!r} "
+                    f"跳過了中間 stages {skipped!r}。"
+                ),
+                stage=cur,
+                actions=[
+                    f"先把流程帶到 {skipped[0]!r}（通常透過 VERIFY-PASS phase=N 自動推進）",
+                    "或切換到不要求 phase 驗證的 mode（例如 bugfix）",
+                ],
+            ), file=sys.stderr)
+            return 2
 
     if skill not in _GATED_SKILLS:
         return 0
