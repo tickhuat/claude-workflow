@@ -53,3 +53,20 @@ def test_cascade_auditing_prompt_has_placeholders() -> None:
     prompt = (SKILLS_DIR / "cascade-auditing" / "cascade-prompt.md").read_text(encoding="utf-8")
     for placeholder in ("{BASE_SHA}", "{HEAD_SHA}", "{CHANGED_FILES}"):
         assert placeholder in prompt, f"cascade-prompt.md missing placeholder: {placeholder}"
+
+
+def test_cascade_auditing_uses_documented_subagent_type() -> None:
+    """Contract test: cascade-auditing dispatches via `general-purpose` subagent_type.
+
+    `general-purpose` is a Claude Code harness contract — not anything in this
+    repo. If the literal in SKILL.md drifts from the harness's accepted set
+    (typo, rename), the dispatch silently produces nothing useful. This test
+    catches typo/refactor drift in our SKILL.md but cannot verify the harness
+    side. If Claude Code renames the subagent_type, update SKILL.md AND this
+    test together.
+    """
+    skill_md = (SKILLS_DIR / "cascade-auditing" / "SKILL.md").read_text(encoding="utf-8")
+    assert '`subagent_type: "general-purpose"`' in skill_md, (
+        "cascade-auditing/SKILL.md must explicitly instruct dispatching with "
+        "subagent_type='general-purpose' — see test docstring for rationale."
+    )

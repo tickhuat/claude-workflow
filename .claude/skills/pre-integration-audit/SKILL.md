@@ -46,23 +46,25 @@ self-decides whether to run a real check or output `SKIP:`.
 
 ### Step 4 — Consolidate and present
 
-Print to user, in this order:
+Compose a single summary message containing **exactly** these sections,
+in this order, then print it to the user:
 
-```
-## Pre-Integration Audit Summary
-
-**Cascade audit** (cross-cutting "changed-A-broke-B"):
-<CASCADE_REPORT>
-
-**Live verification** (runtime state divergence):
-<LIVE_REPORT>
-
----
-What next?
-1. Fix Critical/Important findings now (recommended if any)
-2. Proceed to finishing-a-development-branch (no Critical/Important blockers)
-3. Open a follow-up issue for Minor findings (skip them for this PR)
-```
+1. Heading: `## Pre-Integration Audit Summary`
+2. Subheading: `**Cascade audit** (cross-cutting "changed-A-broke-B"):` followed
+   by the **full verbatim report** captured from `Skill(cascade-auditing)` in
+   Step 2 (Critical / Important / Minor / Clean sections — do not summarize
+   or editorialize)
+3. Subheading: `**Live verification** (runtime state divergence):` followed
+   by the **full verbatim report** captured from `Skill(live-verification)` in
+   Step 3 (either the SKIP line or the PASS/Critical verdict)
+4. Horizontal rule: `---`
+5. Subheading: `What next?` followed by these three options as a numbered
+   list, exactly as written:
+   ```
+   1. Fix Critical/Important findings now (recommended if any)
+   2. Proceed to finishing-a-development-branch (no Critical/Important blockers)
+   3. Open a follow-up issue for Minor findings (skip them for this PR)
+   ```
 
 Wait for user choice. Do not auto-invoke `finishing-a-development-branch` —
 the user must explicitly choose option 2.

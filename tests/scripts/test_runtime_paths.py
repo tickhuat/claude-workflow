@@ -61,9 +61,26 @@ class TestIsRuntimeTouching:
         applies, matched = is_runtime_touching(files)
         assert applies is True
 
-    def test_runtime_trigger_globs_is_non_empty_and_immutable(self) -> None:
+    def test_runtime_trigger_globs_contains_required_entries_and_is_immutable(self) -> None:
+        """Asserts specific globs are present so silent deletions fail loudly.
+
+        Previous version used `len(...) >= 4` lower bound — deleting up to 3
+        entries still passed. Asserting specific entries means a removal forces
+        the test author to consciously update the expectation, not coast.
+        """
         assert isinstance(RUNTIME_TRIGGER_GLOBS, tuple)
-        assert len(RUNTIME_TRIGGER_GLOBS) >= 4
+        required = {
+            ".claude/scripts/**",
+            ".claude/dev-state.json",
+            ".claude/dev-rules.config.yaml",
+            ".claude/dev-rules.config.local.yaml",
+            ".claude/settings.json",
+            ".claude/settings.local.json",
+            ".claude/hooks/**",
+        }
+        actual = set(RUNTIME_TRIGGER_GLOBS)
+        missing = required - actual
+        assert not missing, f"Required runtime globs missing: {missing}"
         # tuples raise on assignment
         with pytest.raises((TypeError, AttributeError)):
             RUNTIME_TRIGGER_GLOBS[0] = "modified"  # type: ignore[index]
