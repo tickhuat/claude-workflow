@@ -111,3 +111,53 @@ def test_doctrine_cites_source_adrs(filename: str, expected_adrs: list[str]) -> 
     for adr_id in expected_adrs:
         # Accept "0014" or "ADR 0014" or "[0014]" — any literal occurrence.
         assert adr_id in body, f"{filename}: missing citation of ADR {adr_id}"
+
+
+# ---- lib.doctrine API ----
+
+@pytest.fixture()
+def fake_doctrine_dir(tmp_path, monkeypatch):
+    """Fake a docs/doctrine/ for unit-testing list_doctrine() in isolation."""
+    d = tmp_path / "docs" / "doctrine"
+    d.mkdir(parents=True)
+    (d / "alpha.md").write_text(
+        "---\ntitle: Alpha\nlast_updated: 2026-05-09\n---\n\n"
+        "First paragraph of alpha.\n\nSecond paragraph.\n"
+    )
+    (d / "beta.md").write_text(
+        "---\ntitle: Beta\nlast_updated: 2026-05-09\n---\n\n"
+        "Beta intro line.\n"
+    )
+    monkeypatch.setattr(
+        "lib.state.project_root", lambda: tmp_path
+    )
+    return d
+
+
+def test_list_doctrine_returns_entries(fake_doctrine_dir):
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+    from lib.doctrine import list_doctrine
+
+    entries = list_doctrine()
+    titles = {e["title"] for e in entries}
+    assert titles == {"Alpha", "Beta"}
+
+
+def test_list_doctrine_summary_is_first_paragraph(fake_doctrine_dir):
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+    from lib.doctrine import list_doctrine
+
+    entries = {e["title"]: e for e in list_doctrine()}
+    assert entries["Alpha"]["summary"] == "First paragraph of alpha."
+    assert entries["Beta"]["summary"] == "Beta intro line."
+
+
+def test_list_doctrine_empty_when_no_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr("lib.state.project_root", lambda: tmp_path)
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+    from lib.doctrine import list_doctrine
+
+    assert list_doctrine() == []
