@@ -3,7 +3,7 @@ title: Hook contract
 last_updated: 2026-05-09
 ---
 
-How Claude Code hooks integrate with `claude-workflow`: the stdin/stdout/exit-code contract, the seven hooks currently shipped, and the rules for adding new ones.
+How Claude Code hooks integrate with `claude-workflow`: the stdin/stdout/exit-code contract, which hooks are shipped and what each does, and the rules for adding new ones.
 
 ## Overview
 
