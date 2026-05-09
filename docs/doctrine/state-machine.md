@@ -57,12 +57,20 @@ SKILL_TO_STAGE = {
                                        "exec-prep": "exec-running"},
     "subagent-driven-development":    {"plan-ready": "exec-running",
                                        "exec-prep": "exec-running"},
-    "requesting-code-review":         {"all-phases-verified": "reviewed"},
+    "requesting-code-review":         {"all-phases-verified": "reviewed",
+                                       "exec-running": "reviewed"},
     "finishing-a-development-branch": {"reviewed": "done"},
+    # Mode-switching skills (ADR 0028); see docs/doctrine/mode-model.md.
+    "switch-mode-bugfix":             {"idle": "exec-running",
+                                       "done": "exec-running"},
+    "switch-mode-feature":            {"idle": "session-started",
+                                       "done": "session-started"},
 }
 ```
 
 Each entry maps `current_stage → next_stage`. If the current stage is not in the inner dict, `next_stage_after_skill` returns `None` and no transition occurs — invoking `brainstorming` from `exec-running` is silently ignored rather than blocked, because the skill itself is already complete. Gate-checking (whether you are allowed to invoke the skill at all) is done by `pre_skill.py` separately.
+
+**`requesting-code-review` has two source stages.** `all-phases-verified → reviewed` is the feature-mode path (after every plan phase has emitted `VERIFY-PASS`). `exec-running → reviewed` is the bugfix-mode path (no per-phase verification). Which path is legitimate is enforced by the active mode's `required_stages` list — see [mode-model.md](mode-model.md). The mode-switching skills `switch-mode-bugfix` and `switch-mode-feature` are similarly mode-aware: `pre_skill.py` reads `lib/skills.py:MODE_SWITCH_SKILLS` and bypasses the `required_stages` gate for these skills, because their target stage belongs to a *different* mode's flow.
 
 **`using-git-worktrees` is deliberately absent from `SKILL_TO_STAGE`** ([ADR 0020](../../ADR/0020-using-git-worktrees-noop-transition.md)). Building a git worktree is a tool action — isolating a workspace — not a workflow state transition. It may be called at any stage (mid-brainstorm, mid-phase, post-review) without affecting the stage. `post_skill.py` still records the invocation in `skills_invoked` for audit purposes; only the transition step is skipped.
 
