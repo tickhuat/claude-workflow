@@ -73,8 +73,9 @@ class StateError(RuntimeError):
 
 
 INITIAL_STATE: dict[str, Any] = {
-    "schema_version": 2,
+    "schema_version": 3,
     "stage": "idle",
+    "mode": "feature",
     "current_spec": None,
     "current_plan": None,
     "current_phase": 0,
@@ -152,6 +153,30 @@ def _migrate_v1_to_v2(data: dict) -> dict:
             cleaned.append(bare)
     data["skills_invoked"] = cleaned
     data["schema_version"] = 2
+    return data
+
+
+def _migrate_v2_to_v3(data: dict) -> dict:
+    """v3: add mode field (default 'feature').
+
+    Round 4 Phase 3 introduced the multi-mode workflow (ADR 0027). Legacy
+    state files written before v3 lack the `mode` key; this migrator
+    backfills it without overriding any value that may already be present
+    (defensive).
+
+    Guard: explicit schema_version check prevents accidental misuse from
+    future migrators that might otherwise call this on a v3 dict and
+    silently overwrite schema_version back to 3.
+    """
+    if data.get("schema_version") != 2:
+        raise ValueError(
+            f"_migrate_v2_to_v3 called with schema_version="
+            f"{data.get('schema_version')!r}; expected 2. This function is "
+            "v2-only; future versions need their own migrator."
+        )
+    if "mode" not in data:
+        data["mode"] = "feature"
+    data["schema_version"] = 3
     return data
 
 
@@ -241,6 +266,34 @@ class State:
             except OSError as e:
                 print(
                     f"[WARN by dev-rules] could not persist v2 migration to {p}: {e}",
+                    file=sys.stderr,
+                )
+        # ADR 0027: migrate v2 state files to v3 (add mode field).
+        if data.get("schema_version") == 2:
+            try:
+                with _flocked(p, exclusive=True) as f:
+                    f.seek(0)
+                    current = f.read()
+                    try:
+                        latest = json.loads(current) if current else {}
+                    except json.JSONDecodeError:
+                        latest = {}
+                    if latest.get("schema_version") == 3:
+                        # Another process won the race; use the migrated data
+                        # and stay silent (no INFO since we didn't migrate).
+                        data = latest
+                    else:
+                        data = _migrate_v2_to_v3(latest if latest else data)
+                        f.seek(0)
+                        f.truncate()
+                        f.write(json.dumps(data, indent=2, ensure_ascii=False))
+                        print(
+                            "[INFO by dev-rules] state migrated v2 → v3 (mode field added)",
+                            file=sys.stderr,
+                        )
+            except OSError as e:
+                print(
+                    f"[WARN by dev-rules] could not persist v3 migration to {p}: {e}",
                     file=sys.stderr,
                 )
         # 補齊新欄位（向前相容）

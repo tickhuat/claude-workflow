@@ -124,14 +124,15 @@ def test_state_load_drops_legacy_adrs_read_count(tmp_project):
 
 def test_initial_state_has_schema_version(tmp_project):
     s = State.load()
-    assert s.data["schema_version"] == 2
+    assert s.data["schema_version"] == 3
+    assert s.data["mode"] == "feature"
 
 
 def test_legacy_state_without_schema_version_is_auto_filled(tmp_project, capsys):
-    """Legacy state files (no schema_version key) should load OK and end at v2.
+    """Legacy state files (no schema_version key) should load OK and end at v3.
 
-    Legacy fill promotes missing → 1, then v1→v2 migration runs immediately
-    after, so the in-memory and on-disk version both land at 2.
+    Legacy fill promotes missing → 1, then v1→v2 and v2→v3 migrations run
+    immediately after, so the in-memory and on-disk version both land at 3.
     """
     path = tmp_project / ".claude" / "dev-state.json"
     path.parent.mkdir(exist_ok=True)
@@ -141,21 +142,21 @@ def test_legacy_state_without_schema_version_is_auto_filled(tmp_project, capsys)
         # NOTE: no schema_version
     }))
     s = State.load()
-    assert s.data["schema_version"] == 2
+    assert s.data["schema_version"] == 3
     err = capsys.readouterr().err
     assert "schema_version" in err and "legacy" in err.lower()
 
 
 def test_state_with_existing_schema_version_does_not_warn(tmp_project, capsys):
-    """If schema_version is already at v2, no INFO message."""
+    """If schema_version is already at v3, no INFO message."""
     path = tmp_project / ".claude" / "dev-state.json"
     path.parent.mkdir(exist_ok=True)
     path.write_text(json.dumps({
         "stage": "idle",
-        "schema_version": 2,
+        "schema_version": 3,
     }))
     s = State.load()
-    assert s.data["schema_version"] == 2
+    assert s.data["schema_version"] == 3
     err = capsys.readouterr().err
     assert "legacy" not in err.lower()
 
@@ -163,25 +164,27 @@ def test_state_with_existing_schema_version_does_not_warn(tmp_project, capsys):
 def test_legacy_state_auto_fill_persists_to_disk(tmp_project, capsys):
     """E3: After auto-fill + migration, the next State.load() should NOT print
     the legacy INFO again because schema_version was written back to the file
-    (and the v1→v2 migration also persisted)."""
+    (and the v1→v2→v3 migrations also persisted)."""
     path = tmp_project / ".claude" / "dev-state.json"
     path.parent.mkdir(exist_ok=True)
     path.write_text(json.dumps({
         "stage": "session-started",
         "skills_invoked": ["using-superpowers"],
     }))
-    # First load: triggers auto-fill, prints INFO, then migrates v1→v2
+    # First load: triggers auto-fill, prints INFO, then migrates v1→v2→v3
     State.load()
     err1 = capsys.readouterr().err
     assert "schema_version" in err1 and "legacy" in err1.lower()
-    # Disk file should now have schema_version at v2 (legacy fill → 1, then migrated → 2)
+    # Disk file should now have schema_version at v3 (legacy fill → 1, then
+    # migrated → 2, then migrated → 3)
     reloaded = json.loads(path.read_text())
-    assert reloaded["schema_version"] == 2
-    # Second load: file already at v2 → no legacy INFO and no migration INFO
+    assert reloaded["schema_version"] == 3
+    # Second load: file already at v3 → no legacy INFO and no migration INFO
     State.load()
     err2 = capsys.readouterr().err
     assert "legacy" not in err2.lower()
     assert "v1 → v2" not in err2 and "v1 -> v2" not in err2
+    assert "v2 → v3" not in err2 and "v2 -> v3" not in err2
 
 
 def test_is_valid_stage_accepts_lifecycle_stages():
@@ -325,14 +328,18 @@ def test_migrate_v1_to_v2_handles_missing_skills_key():
     assert result["schema_version"] == 2
 
 
-def test_initial_state_schema_is_v2(tmp_project):
-    """Fresh state files start at schema_version 2."""
+def test_initial_state_schema_is_v3(tmp_project):
+    """Fresh state files start at schema_version 3."""
     s = State.load()
-    assert s.data["schema_version"] == 2
+    assert s.data["schema_version"] == 3
 
 
 def test_load_triggers_migration_when_schema_version_is_1(tmp_project, capsys):
-    """A v1 state file with namespace-prefixed entries gets migrated on load."""
+    """A v1 state file with namespace-prefixed entries gets migrated on load.
+
+    Terminal state is v3 (chains v1→v2 then v2→v3); skills_invoked dedupe
+    happens in the v1→v2 step.
+    """
     sp = tmp_project / ".claude" / "dev-state.json"
     sp.parent.mkdir(exist_ok=True)
     sp.write_text(json.dumps({
@@ -341,14 +348,18 @@ def test_load_triggers_migration_when_schema_version_is_1(tmp_project, capsys):
         "skills_invoked": ["superpowers:brainstorming", "brainstorming"],
     }))
     s = State.load()
-    assert s.data["schema_version"] == 2
+    assert s.data["schema_version"] == 3
     assert s.data["skills_invoked"] == ["brainstorming"]
     err = capsys.readouterr().err
     assert "v1 → v2" in err or "v1 -> v2" in err
 
 
 def test_load_persists_migration_to_disk(tmp_project):
-    """After migration, the state file on disk should be at v2."""
+    """After migration, the state file on disk should be at v3.
+
+    v1 input chains v1→v2 then v2→v3; both writes persist back to disk so
+    the final file is at the latest schema version.
+    """
     sp = tmp_project / ".claude" / "dev-state.json"
     sp.parent.mkdir(exist_ok=True)
     sp.write_text(json.dumps({
@@ -357,21 +368,46 @@ def test_load_persists_migration_to_disk(tmp_project):
     }))
     State.load()
     on_disk = json.loads(sp.read_text())
-    assert on_disk["schema_version"] == 2
+    assert on_disk["schema_version"] == 3
     assert on_disk["skills_invoked"] == ["foo"]
 
 
-def test_load_does_not_re_migrate_when_already_v2(tmp_project, capsys):
-    """A v2 state file should NOT trigger migration on load."""
+def test_load_v2_input_is_migrated_to_v3_with_info(tmp_project, capsys):
+    """A v2 state file gets migrated to v3 (adds mode=feature) with one INFO.
+
+    Split from the original test_load_does_not_re_migrate_when_already_v2:
+    the v1→v2 migrator should NOT fire on v2 input (its guard rejects v2),
+    but the v2→v3 migrator SHOULD fire on v2 input.
+    """
     sp = tmp_project / ".claude" / "dev-state.json"
     sp.parent.mkdir(exist_ok=True)
     sp.write_text(json.dumps({
         "schema_version": 2,
         "skills_invoked": ["foo"],
     }))
+    s = State.load()
+    err = capsys.readouterr().err
+    # v1→v2 must NOT fire (guard would raise if it did)
+    assert "v1 → v2" not in err and "v1 -> v2" not in err
+    # v2→v3 SHOULD fire — file is v2 on disk, needs the mode field
+    assert ("v2 → v3" in err or "v2 -> v3" in err)
+    assert s.data["schema_version"] == 3
+    assert s.data["mode"] == "feature"
+
+
+def test_load_does_not_re_migrate_when_schema_version_is_already_v3(tmp_project, capsys):
+    """A v3 state file should NOT trigger any migration on load (no INFO)."""
+    sp = tmp_project / ".claude" / "dev-state.json"
+    sp.parent.mkdir(exist_ok=True)
+    sp.write_text(json.dumps({
+        "schema_version": 3,
+        "mode": "feature",
+        "skills_invoked": ["foo"],
+    }))
     State.load()
     err = capsys.readouterr().err
     assert "v1 → v2" not in err and "v1 -> v2" not in err
+    assert "v2 → v3" not in err and "v2 -> v3" not in err
 
 
 def test_save_serializes_concurrent_mutations(tmp_project):
@@ -498,15 +534,16 @@ def test_concurrent_v2_migration_only_one_info(tmp_project):
         f2 = ex.submit(run_loader)
         r1, r2 = f1.result(), f2.result()
 
-    # Both subprocesses should exit cleanly with schema_version=2 on stdout
+    # Both subprocesses should exit cleanly with schema_version=3 on stdout
+    # (v1 input chains v1→v2 then v2→v3, terminal state is v3).
     assert r1.returncode == 0, f"loader 1 failed: {r1.stderr}"
     assert r2.returncode == 0, f"loader 2 failed: {r2.stderr}"
-    assert r1.stdout.strip() == "2"
-    assert r2.stdout.strip() == "2"
+    assert r1.stdout.strip() == "3"
+    assert r2.stdout.strip() == "3"
 
-    # Final disk file is v2
+    # Final disk file is v3
     final = json.loads(p.read_text())
-    assert final["schema_version"] == 2
+    assert final["schema_version"] == 3
 
     # Combined stderr should contain exactly ONE migration INFO
     combined_err = r1.stderr + r2.stderr
@@ -515,3 +552,77 @@ def test_concurrent_v2_migration_only_one_info(tmp_project):
         f"expected exactly 1 v2 migration INFO across both loaders; "
         f"got {info_count}.\nstderr 1: {r1.stderr!r}\nstderr 2: {r2.stderr!r}"
     )
+
+
+def test_initial_state_has_schema_version_3():
+    """Phase 3 / ADR 0027: INITIAL_STATE bumped to v3 with default mode field."""
+    from claude_workflow.lib.state import INITIAL_STATE
+    assert INITIAL_STATE["schema_version"] == 3
+    assert INITIAL_STATE["mode"] == "feature"
+
+
+def test_migrate_v2_to_v3_adds_mode_field():
+    from claude_workflow.lib.state import _migrate_v2_to_v3
+    data = {"schema_version": 2, "stage": "idle"}
+    result = _migrate_v2_to_v3(data)
+    assert result["schema_version"] == 3
+    assert result["mode"] == "feature"
+
+
+def test_migrate_v2_to_v3_preserves_existing_mode_value():
+    """If a v2 state somehow already has mode (paranoid defence), preserve it."""
+    from claude_workflow.lib.state import _migrate_v2_to_v3
+    data = {"schema_version": 2, "mode": "bugfix"}
+    result = _migrate_v2_to_v3(data)
+    assert result["schema_version"] == 3
+    assert result["mode"] == "bugfix"
+
+
+def test_migrate_v2_to_v3_rejects_wrong_schema_version():
+    from claude_workflow.lib.state import _migrate_v2_to_v3
+    import pytest
+    with pytest.raises(ValueError, match=r"expected 2"):
+        _migrate_v2_to_v3({"schema_version": 1})
+
+
+def test_load_triggers_v2_to_v3_migration(tmp_project, capsys):
+    """A v2 state file on disk loads as v3 with mode=feature, prints INFO once."""
+    import json
+    from claude_workflow.lib.state import State
+    p = tmp_project / ".claude" / "dev-state.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"schema_version": 2, "stage": "idle"}))
+    s = State.load()
+    assert s.data["schema_version"] == 3
+    assert s.data["mode"] == "feature"
+    err = capsys.readouterr().err
+    assert "v2" in err and "v3" in err and "mode" in err.lower()
+    on_disk = json.loads(p.read_text())
+    assert on_disk["schema_version"] == 3
+    assert on_disk["mode"] == "feature"
+
+
+def test_load_chains_v1_v2_v3_migrations(tmp_project, capsys):
+    """A legacy state without schema_version chains all migrations to v3."""
+    import json
+    from claude_workflow.lib.state import State
+    p = tmp_project / ".claude" / "dev-state.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"stage": "idle", "skills_invoked": ["superpowers:brainstorming"]}))
+    s = State.load()
+    assert s.data["schema_version"] == 3
+    assert s.data["mode"] == "feature"
+    assert s.data["skills_invoked"] == ["brainstorming"]
+
+
+def test_load_does_not_re_migrate_when_schema_version_is_3(tmp_project, capsys):
+    """Already-v3 state on disk: load returns as-is, no migration INFO."""
+    import json
+    from claude_workflow.lib.state import State
+    p = tmp_project / ".claude" / "dev-state.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"schema_version": 3, "mode": "feature", "stage": "idle"}))
+    capsys.readouterr()  # clear
+    s = State.load()
+    assert s.data["schema_version"] == 3
+    assert "v2 → v3" not in capsys.readouterr().err
