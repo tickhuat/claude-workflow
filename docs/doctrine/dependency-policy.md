@@ -3,6 +3,8 @@ title: Dependency policy
 last_updated: 2026-05-09
 ---
 
+What runtime libraries `claude-workflow` is allowed to depend on, why each was added, and how dev-only deps stay out of the runtime surface.
+
 ## Runtime dependencies
 
 Only PyYAML is a required runtime dependency; everything else uses Python 3.10+ stdlib.

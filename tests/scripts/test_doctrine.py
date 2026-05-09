@@ -163,8 +163,6 @@ def test_list_doctrine_empty_when_no_dir(tmp_path, monkeypatch):
     assert list_doctrine() == []
 
 
-
-
 # ---- _first_paragraph heading-skip behaviour (issue #19) ----
 
 def _import_first_paragraph():

@@ -3,6 +3,8 @@ title: State machine
 last_updated: 2026-05-09
 ---
 
+The enforcement backbone — `dev-state.json` plus the hook scripts that read and advance it. Covers stage graph, mode-aware transitions, and schema migrations.
+
 ## Overview
 
 The state machine is the enforcement backbone of `claude-workflow`. It consists of two cooperating pieces:
