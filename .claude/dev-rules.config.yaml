@@ -50,3 +50,24 @@ auto_advance_phase: true
 
 # commit message 必須含的偏離標記（pre_bash + post_bash 都用這條）
 commit_deviation_keyword: "Deviation:"
+
+# Mode definitions (ADR 0027). Each mode declares which stages it visits and
+# which gates are active during the cycle. Phase 3 ships the default
+# `feature` mode only; Phase 4 will add `bugfix`. Fork users add custom
+# modes here without touching framework Python code.
+modes:
+  feature:
+    required_stages:
+      - idle
+      - session-started
+      - spec-ready
+      - plan-ready
+      - exec-running
+      - all-phases-verified
+      - reviewed
+      - done
+    require_spec: true
+    require_plan: true
+    require_phase_verify: true
+    require_review: true
+    sensitive_globs_strict: true

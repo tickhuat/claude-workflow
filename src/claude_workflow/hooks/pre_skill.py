@@ -15,7 +15,9 @@ from claude_workflow.lib.adr import index_path
 from claude_workflow.lib.bypass import is_bypassed, log_bypass
 from claude_workflow.lib.frontmatter import FrontmatterError, parse
 from claude_workflow.lib.messages import format_block
+from claude_workflow.lib.modes import current_mode_config
 from claude_workflow.lib.skills import GATED_SKILLS as _GATED_SKILLS
+from claude_workflow.lib.skills import next_stage_after_skill
 from claude_workflow.lib.state import State, StateError, project_root
 
 
@@ -70,9 +72,10 @@ def main() -> int:
     skill = (event.get("tool_input") or {}).get("skill", "")
     if ":" in skill:
         skill = skill.split(":", 1)[-1]
-    if skill not in _GATED_SKILLS:
-        return 0
 
+    # Load state up-front so mode check can run for any skill with a transition,
+    # not just GATED_SKILLS. Single State.load — the previous flow loaded it
+    # only inside the GATED_SKILLS branch.
     try:
         s = State.load()
     except StateError as e:
@@ -85,6 +88,38 @@ def main() -> int:
 
     if is_bypassed():
         log_bypass(hook="pre_skill", tool="Skill", tool_input=event.get("tool_input") or {}, stage=s.data["stage"])
+        return 0
+
+    # Mode-aware required_stages check (ADR 0027). Applies to every skill that
+    # has a SKILL_TO_STAGE transition; skills without a transition (e.g.
+    # using-git-worktrees per ADR 0020) get target=None and are exempt.
+    target = next_stage_after_skill(skill, s.data["stage"])
+    if target is not None:
+        mc = current_mode_config(s)
+        rs = mc.required_stages
+        if target not in rs:
+            print(format_block(
+                problem=f"Skill {skill!r} 想推進到 stage={target!r}, 但 mode={mc.name!r} 不含此 stage。",
+                stage=s.data["stage"],
+                actions=[
+                    f"切換到能容納 {target!r} 的 mode（如 feature）",
+                    "或挑選符合當前 mode 的 skill",
+                ],
+            ), file=sys.stderr)
+            return 2
+        # Monotone-forward enforcement (resolution C-β): if current is in
+        # required_stages, target must come strictly after it. Skip when
+        # current is outside required_stages (e.g. dynamic phase-N-* states).
+        cur = s.data["stage"]
+        if cur in rs and rs.index(target) <= rs.index(cur):
+            print(format_block(
+                problem=f"mode={mc.name!r}: stage {cur!r} → {target!r} 不是向前 transition (required_stages 是有序的)。",
+                stage=cur,
+                actions=[f"確認 mode 對應的 stage 順序，或更換 skill"],
+            ), file=sys.stderr)
+            return 2
+
+    if skill not in _GATED_SKILLS:
         return 0
 
     required = _required_adrs(s)

@@ -74,9 +74,11 @@ Field semantics:
 | `require_review` | bool | `pre_skill.py` gates `finishing-a-development-branch` on `reviewed` stage |
 | `sensitive_globs_strict` | bool | `pre_bash.py` / `pre_edit.py` block sensitive path edits without new ADR |
 
+For `require_phase_verify` and `require_review`: in Phase 3 these flags are validated and exposed on `ModeConfig` but are not yet checked by hooks — feature mode's existing `SKILL_TO_STAGE` transitions implicitly enforce both gates. Phase 4 (bugfix mode + switch-mode skills) is when these flags drive distinct hook behaviour.
+
 `lib/config.py` validates each mode record at config-load time. If any required field is missing, it prints a `[ERROR by dev-rules]` line to stderr and falls back to the built-in defaults. This prevents a silently broken mode from bypassing gates unexpectedly.
 
-Note on implementation status: the `modes:` YAML structure is decided (per [ADR 0027](../../ADR/0027-mode-model-first-class.md)) and will be present in `dev-rules.config.yaml`. The Python module `lib/modes.py` — providing `ModeRegistry`, `ModeConfig` dataclass, and `current_mode_config(state) -> ModeConfig` — is being implemented in Phase 3 of Round 4 and is not yet shipped.
+Implementation status: shipped in Round 4 Phase 3. `lib/modes.py` provides `ModeRegistry`, `ModeConfig`, and `current_mode_config(state)`; the `feature` mode YAML record lives in `templates/.claude/dev-rules.config.yaml` (mirrored to `.claude/dev-rules.config.yaml`) and is mirrored in `lib/config.py` `DEFAULTS` (ADR 0015).
 
 ---
 
@@ -134,9 +136,9 @@ Reads `require_spec` and `require_plan`. If `require_spec` is `true` and `state.
 
 Also reads `sensitive_globs_strict`. If `true`, any Edit/Write targeting a path that matches `sensitive_globs` patterns (e.g., `auth*`, `schema*`, `migrations/**`, `*.config.*`) is blocked unless a new ADR citing the path has been added in the current session.
 
-**`pre_bash.py`**
+**`pre_bash.py`** *(deferred — Phase 3 ships only the YAML/registry/Python plumbing, not this check)*
 
-Reads `sensitive_globs_strict`. Same semantics as `pre_edit.py`: if `true`, Bash commands that would create or overwrite files on sensitive paths require a new ADR. This catches cases where code generation via shell command bypasses the Edit hook.
+The intended behaviour is to read `sensitive_globs_strict` and, if true, block Bash commands that would create or overwrite files on sensitive paths (`rm`, `mv`, `cp`, `>` redirection, `sed -i`, etc.). Implementing this requires a bash-command parser to detect file-modifying invocations against arbitrary command strings. Round 4 Phase 3 wires the flag through `current_mode_config(state)` so future code can read it; the parser-based check itself is scheduled for a follow-up phase. Until then, sensitive-path enforcement is delivered exclusively by `pre_edit.py` for `Edit` / `Write` / `MultiEdit` operations.
 
 All three hooks fail open on an unknown mode name — they print a `[WARN by dev-rules]` line and proceed without blocking — so a misconfigured custom mode degrades to no gating rather than a hard lock.
 
