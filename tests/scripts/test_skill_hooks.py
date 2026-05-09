@@ -429,7 +429,9 @@ def test_pre_skill_blocks_when_target_outside_mode_required_stages(tmp_project):
         env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
     )
     assert proc.returncode == 2, f"expected BLOCK, got rc={proc.returncode}, stderr={proc.stderr}"
-    assert "spec-ready" in proc.stderr or "restricted" in proc.stderr
+    # Both pieces appear in the actual error message; using `and` (not `or`)
+    # catches future shape regressions where one of them goes missing.
+    assert "spec-ready" in proc.stderr and "restricted" in proc.stderr
 
 
 def test_pre_skill_passes_when_target_in_mode_required_stages(tmp_project):

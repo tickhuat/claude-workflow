@@ -440,6 +440,10 @@ def test_pre_edit_skips_sensitive_block_when_sensitive_globs_strict_false(tmp_pr
         env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
     )
     assert proc.returncode == 0, f"expected PASS, got rc={proc.returncode}, stderr={proc.stderr}"
+    # Prove the strict-false branch was actually taken (rc=0 alone could also
+    # come from deviation rules letting a single non-target file pass with a
+    # warn). A blocked sensitive-paths gate would emit `[BLOCKED by dev-rules]`.
+    assert "[BLOCKED by dev-rules]" not in proc.stderr
 
 
 def test_pre_edit_single_save_when_event_flag_and_deviation_both_fire(tmp_project, set_stage, monkeypatch):
