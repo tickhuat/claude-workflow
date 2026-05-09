@@ -79,3 +79,39 @@ def test_mode_switch_skills_table_shape():
         "switch-mode-bugfix": "bugfix",
         "switch-mode-feature": "feature",
     }
+
+
+def test_switch_mode_bugfix_transitions_idle_and_done_to_exec_running():
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("switch-mode-bugfix", "idle") == "exec-running"
+    assert next_stage_after_skill("switch-mode-bugfix", "done") == "exec-running"
+
+
+def test_switch_mode_feature_transitions_idle_and_done_to_session_started():
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("switch-mode-feature", "idle") == "session-started"
+    assert next_stage_after_skill("switch-mode-feature", "done") == "session-started"
+
+
+def test_switch_mode_skills_blocked_mid_flow():
+    """Mid-flow lock: switch-mode-* must return None for any stage other than idle/done.
+    The mid-flow lock is enforced by the SKILL_TO_STAGE table itself (no entries
+    for other source stages). See ADR 0028."""
+    from claude_workflow.lib.skills import next_stage_after_skill
+    mid_flow_stages = [
+        "session-started", "spec-ready", "plan-ready",
+        "exec-running", "all-phases-verified", "reviewed",
+        "phase-1-done", "phase-1-verified",
+    ]
+    for stage in mid_flow_stages:
+        assert next_stage_after_skill("switch-mode-bugfix", stage) is None, \
+            f"switch-mode-bugfix should not transition from {stage}"
+        assert next_stage_after_skill("switch-mode-feature", stage) is None, \
+            f"switch-mode-feature should not transition from {stage}"
+
+
+def test_mode_switch_skills_keys_align_with_skill_to_stage():
+    """Every key in MODE_SWITCH_SKILLS must also be in SKILL_TO_STAGE (kept in sync)."""
+    from claude_workflow.lib.skills import MODE_SWITCH_SKILLS, SKILL_TO_STAGE
+    for skill in MODE_SWITCH_SKILLS:
+        assert skill in SKILL_TO_STAGE, f"{skill!r} in MODE_SWITCH_SKILLS but not SKILL_TO_STAGE"

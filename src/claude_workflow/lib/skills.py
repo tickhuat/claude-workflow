@@ -20,6 +20,10 @@ SKILL_TO_STAGE: dict[str, dict[str, str]] = {
     "requesting-code-review": {"all-phases-verified": "reviewed"},
     "finishing-a-development-branch": {"reviewed": "done"},
     "using-superpowers": {"idle": "session-started"},
+    # ADR 0028: mode-switching skills. Only {idle, done} as valid source stages
+    # is intentional — it enforces the mid-flow lock at the data-layer.
+    "switch-mode-bugfix": {"idle": "exec-running", "done": "exec-running"},
+    "switch-mode-feature": {"idle": "session-started", "done": "session-started"},
 }
 
 
