@@ -101,25 +101,24 @@ Phase tracking fields in the state:
 
 ## State schema
 
-`dev-state.json` is defined by `INITIAL_STATE` in `lib/state.py`. Current schema version: **2** (see Schema Migration Policy below). Fields:
+`dev-state.json` is defined by `INITIAL_STATE` in `lib/state.py`. Current schema version: **3** (see Schema Migration Policy below). Fields:
 
 | Field | Type | Description |
 |---|---|---|
-| `schema_version` | int | Migration guard; currently 2 ([ADR 0010](../../ADR/0010-state-schema-version.md)) |
+| `schema_version` | int | Migration guard; currently 3 ([ADR 0010](../../ADR/0010-state-schema-version.md)) |
 | `stage` | str | Current workflow stage (validated by `is_valid_stage`) |
+| `mode` | str | Active workflow mode (e.g. `"feature"`, `"bugfix"`); default `"feature"` ([ADR 0027](../../ADR/0027-mode-model-first-class.md)) |
 | `current_spec` | str \| null | Path to the active spec file |
 | `current_plan` | str \| null | Path to the active plan file |
 | `current_phase` | int | Active phase number within `exec-running` |
 | `phases_total` | int | Total phases in the active plan |
-| `phases_verified` | list[int] | Phases that have passed verification |
+| `phases_verified` | list[int] | Phase IDs that have passed verification |
 | `skills_invoked` | list[str] | Ordered list of bare skill names invoked this session |
 | `adrs_read` | list[str] | ADR slugs confirmed read by the pre-skill gate |
 | `deviation_log` | list[dict] | Records of files touched outside `target_files` per phase |
 | `event_flags` | dict | Per-prompt detection flags; see Event Flags section |
 | `phase_files_touched` | dict[str, list[str]] | Runtime-populated; not in INITIAL_STATE — set via `setdefault` per phase (populated by `post_edit.py`) |
 | `last_transition` | str \| null | ISO-8601 UTC timestamp of the most recent stage change |
-
-**Planned addition:** A `mode` field will be added in schema v3 per [ADR 0027](../../ADR/0027-mode-model-first-class.md) (multi-mode workflow). It will carry the active workflow mode (e.g., `"feature"`, `"bugfix"`); default `"feature"`.
 
 `State.load()` applies forward-compat auto-fill: any field present in `INITIAL_STATE` but missing from the on-disk JSON is filled with its default value before returning. This means adding a new field to `INITIAL_STATE` automatically handles older state files without requiring a schema migration, as long as the field's type and semantics are additive. Structural changes (renaming keys, changing value types) still require a versioned migration.
 
@@ -138,8 +137,9 @@ The `schema_version` field was introduced in [ADR 0010](../../ADR/0010-state-sch
 Current migrations:
 
 - **v1 → v2** ([ADR 0018](../../ADR/0018-state-schema-v2-migration.md)): strips `superpowers:` namespace prefixes from `skills_invoked` entries and deduplicates the list while preserving insertion order. This was necessary because [ADR 0012](../../ADR/0012-strip-skill-namespace-prefix.md) began stripping prefixes at the hook entry point, but existing state files retained the old namespaced entries. The migrator (`_migrate_v1_to_v2`) validates it was called with `schema_version == 1` to prevent accidental misuse by future migrators.
+- **v2 → v3** ([ADR 0027](../../ADR/0027-mode-model-first-class.md)): adds the `mode` field to `INITIAL_STATE`, defaulting any existing state file to `"feature"`. Required because Round 4 introduced multi-mode workflows; older state files have no `mode` and would otherwise crash mode-aware hook gating.
 
-Future migrations follow the same pattern: add `_migrate_v2_to_v3`, bump `INITIAL_STATE["schema_version"]` to 3, write an ADR.
+Future migrations follow the same pattern: add `_migrate_v3_to_v4`, bump `INITIAL_STATE["schema_version"]` to 4, write an ADR.
 
 ---
 
