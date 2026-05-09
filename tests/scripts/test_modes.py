@@ -191,3 +191,28 @@ def test_fallback_feature_matches_defaults():
         "sensitive_globs_strict",
     ):
         assert getattr(_FALLBACK_FEATURE, f) == d[f], f"{f} diverged"
+
+
+def test_bugfix_mode_loads_from_registry():
+    """Phase 4: bugfix mode is loadable via ModeRegistry.from_config()."""
+    from claude_workflow.lib.modes import ModeRegistry
+    r = ModeRegistry.from_config()
+    mc = r.get("bugfix")
+    assert mc is not None, "bugfix mode missing from registry"
+    assert mc.name == "bugfix"
+    assert mc.required_stages == ["idle", "exec-running", "reviewed", "done"]
+    assert mc.require_spec is False
+    assert mc.require_plan is False
+    assert mc.require_phase_verify is False
+    assert mc.require_review is True
+    assert mc.sensitive_globs_strict is True
+
+
+def test_bugfix_mode_skips_all_phases_verified():
+    """all-phases-verified must NOT be in bugfix's required_stages — that's the
+    whole point of bugfix mode (no phase-by-phase ceremony)."""
+    from claude_workflow.lib.modes import ModeRegistry
+    mc = ModeRegistry.from_config().get("bugfix")
+    assert "all-phases-verified" not in mc.required_stages
+    assert "spec-ready" not in mc.required_stages
+    assert "plan-ready" not in mc.required_stages

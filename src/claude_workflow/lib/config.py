@@ -60,6 +60,19 @@ DEFAULTS: dict[str, Any] = {
             "require_review": True,
             "sensitive_globs_strict": True,
         },
+        "bugfix": {
+            "required_stages": [
+                "idle",
+                "exec-running",
+                "reviewed",
+                "done",
+            ],
+            "require_spec": False,
+            "require_plan": False,
+            "require_phase_verify": False,
+            "require_review": True,
+            "sensitive_globs_strict": True,
+        },
     },
 }
 

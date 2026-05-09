@@ -71,3 +71,14 @@ modes:
     require_phase_verify: true
     require_review: true
     sensitive_globs_strict: true
+  bugfix:
+    required_stages:
+      - idle
+      - exec-running
+      - reviewed
+      - done
+    require_spec: false
+    require_plan: false
+    require_phase_verify: false
+    require_review: true
+    sensitive_globs_strict: true
