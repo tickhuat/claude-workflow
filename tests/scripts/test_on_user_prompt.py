@@ -4,13 +4,12 @@ import sys
 from pathlib import Path
 
 
-HOOK = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "on_user_prompt.py"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def run_hook(event: dict, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.on_user_prompt"],
         input=json.dumps(event),
         capture_output=True,
         text=True,
@@ -104,7 +103,7 @@ def test_on_user_prompt_respects_custom_keywords(tmp_project):
         "  review_required: []\n"
     )
     r = subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.on_user_prompt"],
         input=json.dumps({"prompt": "這個 endpoint 故障了"}),
         capture_output=True, text=True,
         cwd=tmp_project,
@@ -156,15 +155,14 @@ def test_print_doctrine_index_outputs_doctrine_titles(
         "The state machine guards the dev flow.\n"
     )
     import sys
-    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
     # Purge doctrine + hook modules so they re-import with the patched state
-    # but keep lib.state so monkeypatch target persists.
+    # but keep claude_workflow.lib.state so monkeypatch target persists.
     for mod in list(sys.modules):
-        if mod in ("lib.doctrine", "on_user_prompt"):
+        if mod in ("claude_workflow.lib.doctrine", "claude_workflow.hooks.on_user_prompt"):
             del sys.modules[mod]
-    import lib.state
-    monkeypatch.setattr(lib.state, "project_root", lambda: tmp_path)
-    import on_user_prompt
+    import claude_workflow.lib.state
+    monkeypatch.setattr(claude_workflow.lib.state, "project_root", lambda: tmp_path)
+    from claude_workflow.hooks import on_user_prompt
 
     on_user_prompt._print_doctrine_index()
 
@@ -178,13 +176,12 @@ def test_print_doctrine_index_handles_missing_dir(
     tmp_path, monkeypatch, capsys
 ):
     import sys
-    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
     for mod in list(sys.modules):
-        if mod in ("lib.doctrine", "on_user_prompt"):
+        if mod in ("claude_workflow.lib.doctrine", "claude_workflow.hooks.on_user_prompt"):
             del sys.modules[mod]
-    import lib.state
-    monkeypatch.setattr(lib.state, "project_root", lambda: tmp_path)
-    import on_user_prompt
+    import claude_workflow.lib.state
+    monkeypatch.setattr(claude_workflow.lib.state, "project_root", lambda: tmp_path)
+    from claude_workflow.hooks import on_user_prompt
 
     on_user_prompt._print_doctrine_index()
     captured = capsys.readouterr()

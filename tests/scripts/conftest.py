@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-# 把 .claude/scripts 加入 sys.path 讓測試直接 import
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / ".claude" / "scripts"))
+# After ADR 0030 / Round 4 Phase 2: the claude_workflow package is on sys.path
+# via `pip install -e ".[dev]"` (run by CI and dev setup). No path injection
+# needed here.
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ import json as _json
 def _reset_config_cache():
     """Each test starts with a fresh config cache (avoids test-order coupling)."""
     try:
-        from lib.config import _CACHE
+        from claude_workflow.lib.config import _CACHE
         _CACHE.clear()
     except ImportError:
         pass
@@ -41,7 +41,7 @@ def _reset_config_cache():
 def set_stage(tmp_project):
     """Helper to write specific dev-state.json with given stage and overrides."""
     def _set(**kwargs):
-        from lib.state import INITIAL_STATE
+        from claude_workflow.lib.state import INITIAL_STATE
         import copy as _copy
         full = _copy.deepcopy(INITIAL_STATE)
         full.update(kwargs)

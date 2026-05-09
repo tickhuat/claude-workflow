@@ -28,6 +28,34 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Find a Python >=3.10 to host the project venv. claude-workflow's hook
+# entry points (.claude/settings.json) call `.venv/bin/python -m
+# claude_workflow.hooks.<name>`, so the venv path is part of the contract.
+# PEP 668 makes system-site installs hostile on modern macOS/Linux anyway.
+PY=""
+for cmd in python3.13 python3.12 python3.11 python3.10 python3; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+        if "$cmd" -c "import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)" 2>/dev/null; then
+            PY="$cmd"
+            break
+        fi
+    fi
+done
+
+if [[ -z "$PY" ]]; then
+    echo "ERROR: claude-workflow requires Python >=3.10. Install via brew/apt/pyenv and re-run." >&2
+    exit 1
+fi
+
+if [[ ! -x .venv/bin/python ]]; then
+    echo "claude-workflow: creating venv at .venv/ with $PY..."
+    "$PY" -m venv .venv
+fi
+
+# Ensure framework is installed (editable mode so future upgrades are easy).
+echo "claude-workflow: installing framework (.venv/bin/pip install -e .)..."
+.venv/bin/pip install -e . --quiet
+
 echo "claude-workflow: stripping dogfood examples..."
 
 # Specs / plans — wildcard delete (these directories only hold dogfood at
@@ -54,6 +82,21 @@ echo '[]' > ADR/_index.json
 rm -f .claude/dev-state.json
 rm -f .claude/bypass.log
 rm -f .claude/bypass.log.old
+
+# Restore .claude/ baseline from shipped templates. We use cp -Rn so any
+# pre-existing user config (rare for a fresh fork, but possible) is
+# preserved. BSD cp returns 1 when -n skips a conflict (GNU cp returns 0);
+# the partial copy is still correct, so 0 and 1 are both healthy. Any
+# other exit code (permissions, missing source, full disk) is a real error.
+if [[ -d templates/.claude ]]; then
+    echo "claude-workflow: copying templates/.claude/ baseline..."
+    cp_rc=0
+    cp -Rn templates/.claude/. .claude/ || cp_rc=$?
+    case "$cp_rc" in
+        0|1) ;;
+        *) echo "ERROR: cp failed with rc=$cp_rc" >&2; exit "$cp_rc" ;;
+    esac
+fi
 
 cat <<'EOF'
 

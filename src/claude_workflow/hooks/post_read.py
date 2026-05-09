@@ -7,11 +7,8 @@ import re
 import sys
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-
-from lib.git_utils import git_common_dir  # noqa: E402
-from lib.state import State, StateError, project_root  # noqa: E402
+from claude_workflow.lib.git_utils import git_common_dir
+from claude_workflow.lib.state import State, StateError, project_root
 
 
 _ADR_RE = re.compile(r"^(\d{4}-[\w-]+)\.md$")

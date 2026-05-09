@@ -11,12 +11,8 @@ import os
 import sys
 from pathlib import Path
 
-# 讓 hook 可獨立執行（無 PYTHONPATH 也行）
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-
-from lib.adr import rebuild_index, ADRError  # noqa: E402
-from lib.state import phase_key, project_root, StateError  # noqa: E402
+from claude_workflow.lib.adr import rebuild_index, ADRError
+from claude_workflow.lib.state import phase_key, project_root, StateError
 
 
 def main() -> int:
@@ -44,7 +40,7 @@ def main() -> int:
             print(f"[WARN by dev-rules] ADR index rebuild failed: {e}", file=sys.stderr)
 
     # Phase target_files progress tracking
-    from lib.state import State
+    from claude_workflow.lib.state import State
     try:
         s = State.load()
     except StateError as e:
@@ -59,8 +55,8 @@ def main() -> int:
         or (stage.startswith("phase-") and stage.endswith("-done"))
     )
     if is_exec_stage and s.data.get("current_phase"):
-        from lib.frontmatter import parse, FrontmatterError
-        from lib.glob_match import matches_any
+        from claude_workflow.lib.frontmatter import parse, FrontmatterError
+        from claude_workflow.lib.glob_match import matches_any
 
         plan_rel = s.data.get("current_plan")
         if plan_rel:

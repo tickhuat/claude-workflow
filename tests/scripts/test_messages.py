@@ -1,4 +1,4 @@
-from lib.messages import format_block, format_warn
+from claude_workflow.lib.messages import format_block, format_warn
 
 
 def test_format_block_contains_marker_and_state():

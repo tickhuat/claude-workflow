@@ -5,14 +5,10 @@ from __future__ import annotations
 import json
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-
-from lib.config import load_config  # noqa: E402
-from lib.git_utils import get_last_commit_message, is_commit_command, is_in_rebase  # noqa: E402
-from lib.state import State, StateError, project_root  # noqa: E402
+from claude_workflow.lib.config import load_config
+from claude_workflow.lib.git_utils import get_last_commit_message, is_commit_command, is_in_rebase
+from claude_workflow.lib.state import State, StateError, project_root
 
 
 def main() -> int:

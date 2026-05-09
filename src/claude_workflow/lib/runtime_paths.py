@@ -10,6 +10,9 @@ infrastructural, not user-tunable. Fork users who need a different gate should
 edit this constant directly (and ideally upstream the change).
 
 ADR 0014: glob matching uses pathspec (.gitignore wildmatch semantics).
+ADR 0030: src-layout — old `.claude/scripts/**` glob retired in favour of
+`src/claude_workflow/**`; templates/.claude/** added so PRs that touch the
+shipped scaffold are also gated.
 """
 from __future__ import annotations
 
@@ -17,13 +20,17 @@ import pathspec
 
 
 RUNTIME_TRIGGER_GLOBS: tuple[str, ...] = (
-    ".claude/scripts/**",
+    "src/claude_workflow/**",
+    "templates/.claude/**",
     ".claude/dev-state.json",
     ".claude/dev-rules.config.yaml",
     ".claude/dev-rules.config.local.yaml",
     ".claude/settings.json",
     ".claude/settings.local.json",
     ".claude/hooks/**",
+    # pyproject.toml: dependencies/optional-deps changes can break hook
+    # imports at runtime (silent ModuleNotFoundError in PostToolUse).
+    "pyproject.toml",
 )
 
 

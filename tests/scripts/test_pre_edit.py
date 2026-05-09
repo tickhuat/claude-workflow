@@ -4,12 +4,9 @@ import sys
 from pathlib import Path
 
 
-HOOK = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "pre_edit.py"
-
-
 def run_pre(event, cwd):
     return subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.pre_edit"],
         input=json.dumps(event),
         capture_output=True,
         text=True,
@@ -220,10 +217,7 @@ def test_pre_edit_respects_custom_sensitive_globs(tmp_project, set_stage):
 def test_targets_include_tests_recognizes_various_patterns():
     """_targets_include_tests should accept any pattern that mentions 'test'
     as a path segment."""
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
-    from pre_edit import _targets_include_tests
+    from claude_workflow.hooks.pre_edit import _targets_include_tests
 
     # True positives — segment-aligned 'test' or 'tests'
     assert _targets_include_tests(["tests/**"]) is True
@@ -241,10 +235,7 @@ def test_targets_include_tests_recognizes_various_patterns():
 def test_targets_include_tests_rejects_substring_false_positives():
     """Regression for review feedback: 'test' as substring (not segment) must
     NOT trigger TDD enforcement (latest, protests, contests, attest, etc.)."""
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
-    from pre_edit import _targets_include_tests
+    from claude_workflow.hooks.pre_edit import _targets_include_tests
 
     assert _targets_include_tests(["latest/**"]) is False
     assert _targets_include_tests(["protests/**"]) is False
@@ -253,15 +244,12 @@ def test_targets_include_tests_rejects_substring_false_positives():
 
 
 def test_pre_edit_uses_lib_glob_match_not_local_helper():
-    """Regression: pre_edit must import matches_any from lib.glob_match,
+    """Regression: pre_edit must import matches_any from claude_workflow.lib.glob_match,
     not redefine its own _matches_any."""
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".claude" / "scripts"))
-    import pre_edit
+    from claude_workflow.hooks import pre_edit
     # _matches_any was deleted in this refactor
     assert not hasattr(pre_edit, "_matches_any"), (
-        "pre_edit._matches_any should be removed; use lib.glob_match.matches_any"
+        "pre_edit._matches_any should be removed; use claude_workflow.lib.glob_match.matches_any"
     )
 
 

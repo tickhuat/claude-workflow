@@ -7,12 +7,9 @@ from pathlib import Path
 import pytest
 
 
-HOOK = Path(__file__).resolve().parents[2] / ".claude" / "scripts" / "post_edit.py"
-
-
 def run_hook(event: dict, cwd: Path) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.post_edit"],
         input=json.dumps(event),
         capture_output=True,
         text=True,
@@ -23,7 +20,7 @@ def run_hook(event: dict, cwd: Path) -> subprocess.CompletedProcess:
 
 def run_post_edit(file_path: str, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.post_edit"],
         input=json.dumps({"tool_name": "Edit", "tool_input": {"file_path": file_path}}),
         capture_output=True, text=True,
         cwd=cwd,
@@ -38,7 +35,7 @@ def _setup_plan_and_state(tmp_project, target_files: list, current_phase: int = 
     plan.write_text(
         f"---\nphases:\n  - id: {current_phase}\n    target_files:\n{targets_yaml}\n---\nbody"
     )
-    from lib.state import INITIAL_STATE
+    from claude_workflow.lib.state import INITIAL_STATE
     import copy
     full = copy.deepcopy(INITIAL_STATE)
     full["stage"] = "exec-running"
@@ -73,7 +70,7 @@ def test_post_edit_ignores_non_adr_path(tmp_project):
 
 def test_post_edit_handles_missing_input(tmp_project):
     r = subprocess.run(
-        [sys.executable, str(HOOK)],
+        [sys.executable, "-m", "claude_workflow.hooks.post_edit"],
         input="",
         capture_output=True,
         text=True,

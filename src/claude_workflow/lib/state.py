@@ -297,4 +297,4 @@ def is_valid_stage(s: str) -> bool:
 # Skill metadata moved to lib/skills.py (ADR 0016). Re-exported here for backward
 # compatibility — existing callers that do `from lib.state import next_stage_after_skill`
 # keep working.
-from lib.skills import next_stage_after_skill  # noqa: E402, F401
+from claude_workflow.lib.skills import next_stage_after_skill  # noqa: E402, F401

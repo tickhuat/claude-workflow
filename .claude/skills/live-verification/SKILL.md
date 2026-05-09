@@ -28,7 +28,7 @@ Run via Bash:
 BASE_SHA=$(git merge-base HEAD main)
 HEAD_SHA=$(git rev-parse HEAD)
 git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
-  | python3 .claude/scripts/lib/runtime_paths.py
+  | python3 -m claude_workflow.lib.runtime_paths
 ```
 
 If output starts with `SKIP:` — output the following to the caller and stop:
@@ -91,5 +91,5 @@ When the user reports back:
 
 When new categories of Claude Code runtime state are introduced (new hook
 types, new state files), update `RUNTIME_TRIGGER_GLOBS` in
-`.claude/scripts/lib/runtime_paths.py` AND `tests/scripts/test_runtime_paths.py`.
+`src/claude_workflow/lib/runtime_paths.py` AND `tests/scripts/test_runtime_paths.py`.
 This skill body needs no edit — it consumes the helper output.

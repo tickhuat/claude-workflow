@@ -5,14 +5,10 @@ from __future__ import annotations
 import json
 import re
 import sys
-from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-
-from lib.doctrine import list_doctrine  # noqa: E402
-from lib.config import load_config  # noqa: E402
-from lib.state import State, StateError  # noqa: E402
+from claude_workflow.lib.doctrine import list_doctrine
+from claude_workflow.lib.config import load_config
+from claude_workflow.lib.state import State, StateError
 
 
 def _detect_flags(prompt: str) -> dict[str, bool]:

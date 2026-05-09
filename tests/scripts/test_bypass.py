@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.bypass import is_bypassed, log_bypass
+from claude_workflow.lib.bypass import is_bypassed, log_bypass
 
 
 def test_bypass_not_set(monkeypatch, tmp_project):
@@ -28,7 +28,7 @@ def test_log_bypass_appends(tmp_project):
 
 def test_log_bypass_rotates_at_1mb(tmp_project, monkeypatch):
     """When bypass.log exceeds 1MB, it rotates to bypass.log.old before next write."""
-    from lib import bypass
+    from claude_workflow.lib import bypass
     log = tmp_project / ".claude" / "bypass.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     # Pre-fill log to just over 1 MiB
@@ -44,7 +44,7 @@ def test_log_bypass_rotates_at_1mb(tmp_project, monkeypatch):
 
 def test_log_bypass_replaces_old_backup(tmp_project):
     """Second rotation overwrites the previous .old (we only keep 1 backup)."""
-    from lib import bypass
+    from claude_workflow.lib import bypass
     log = tmp_project / ".claude" / "bypass.log"
     old = log.with_suffix(".log.old")
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -62,7 +62,7 @@ def test_log_bypass_replaces_old_backup(tmp_project):
 
 def test_log_bypass_below_threshold_no_rotation(tmp_project):
     """No rotation when log is under 1 MiB."""
-    from lib import bypass
+    from claude_workflow.lib import bypass
     log = tmp_project / ".claude" / "bypass.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     # 100 bytes — well below threshold

@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from lib.state import project_root
+from claude_workflow.lib.state import project_root
 
 
 DEFAULTS: dict[str, Any] = {

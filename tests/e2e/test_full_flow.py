@@ -7,16 +7,16 @@ from pathlib import Path
 import pytest
 
 PROJECT = Path(__file__).resolve().parents[2]
-SCRIPTS = PROJECT / ".claude" / "scripts"
 
 
-def hook(name: str) -> Path:
-    return SCRIPTS / f"{name}.py"
+def hook(name: str) -> str:
+    """Return the importable module name for a hook (per ADR 0030)."""
+    return f"claude_workflow.hooks.{name}"
 
 
-def fire(hook_path: Path, event: dict, cwd: Path):
+def fire(hook_module: str, event: dict, cwd: Path):
     return subprocess.run(
-        [sys.executable, str(hook_path)],
+        [sys.executable, "-m", hook_module],
         input=json.dumps(event),
         capture_output=True,
         text=True,
@@ -159,7 +159,7 @@ def test_full_flow(e2e_project):
 def test_bypass_logs(e2e_project, monkeypatch):
     monkeypatch.setenv("DEV_RULES_BYPASS", "1")
     # Setup state
-    from lib.state import INITIAL_STATE
+    from claude_workflow.lib.state import INITIAL_STATE
     import copy as _copy
     full = _copy.deepcopy(INITIAL_STATE)
     full["stage"] = "idle"
@@ -168,7 +168,7 @@ def test_bypass_logs(e2e_project, monkeypatch):
     # Try an Edit that would normally be blocked at idle
     src = e2e_project / "src" / "x.py"
     r = subprocess.run(
-        [sys.executable, str(SCRIPTS / "pre_edit.py")],
+        [sys.executable, "-m", "claude_workflow.hooks.pre_edit"],
         input=json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(src)}}),
         capture_output=True,
         text=True,

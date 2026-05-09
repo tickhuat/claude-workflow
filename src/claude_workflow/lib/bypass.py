@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-from lib.state import project_root
+from claude_workflow.lib.state import project_root
 
 ROTATE_BYTES = 1024 * 1024  # 1 MiB — rotate bypass.log when it reaches this size.
 

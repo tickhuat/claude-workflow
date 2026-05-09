@@ -4,13 +4,18 @@ from pathlib import Path
 
 import pytest
 
-from lib.state import State, StateError, INITIAL_STATE
+from claude_workflow.lib.state import State, StateError, INITIAL_STATE
 
 
-def _scripts_dir():
-    """Return absolute path to .claude/scripts (for subprocess sys.path injection)."""
-    from pathlib import Path
-    return Path(__file__).resolve().parents[2] / ".claude" / "scripts"
+def _package_parent_dir():
+    """Return the directory CONTAINING the claude_workflow package.
+
+    Used by subprocess tests that need PYTHONPATH set so `import claude_workflow`
+    succeeds in a child process. With the editable install (ADR 0030 src layout),
+    this resolves to `<repo>/src/`.
+    """
+    import claude_workflow
+    return Path(claude_workflow.__file__).resolve().parent.parent
 
 
 def test_load_creates_initial_when_missing(tmp_project):
@@ -81,7 +86,7 @@ def test_load_forward_compat_partial_event_flags(tmp_project):
     assert s.data["event_flags"]["review_required"] is False
 
 
-from lib.state import next_stage_after_skill
+from claude_workflow.lib.state import next_stage_after_skill
 
 
 def test_next_stage_after_skill_brainstorming():
@@ -180,7 +185,7 @@ def test_legacy_state_auto_fill_persists_to_disk(tmp_project, capsys):
 
 
 def test_is_valid_stage_accepts_lifecycle_stages():
-    from lib.state import is_valid_stage
+    from claude_workflow.lib.state import is_valid_stage
     for s in [
         "idle", "session-started", "spec-ready", "plan-ready",
         "exec-prep", "exec-running", "all-phases-verified", "reviewed", "done",
@@ -189,7 +194,7 @@ def test_is_valid_stage_accepts_lifecycle_stages():
 
 
 def test_is_valid_stage_accepts_phase_done_and_verified():
-    from lib.state import is_valid_stage
+    from claude_workflow.lib.state import is_valid_stage
     assert is_valid_stage("phase-1-done") is True
     assert is_valid_stage("phase-1-verified") is True
     assert is_valid_stage("phase-99-done") is True
@@ -197,7 +202,7 @@ def test_is_valid_stage_accepts_phase_done_and_verified():
 
 
 def test_is_valid_stage_rejects_garbage():
-    from lib.state import is_valid_stage
+    from claude_workflow.lib.state import is_valid_stage
     assert is_valid_stage("garbage") is False
     assert is_valid_stage("phase-1-vrified") is False  # typo
     assert is_valid_stage("phase-0-done") is False  # phase id 從 1 起
@@ -260,19 +265,19 @@ def test_concurrent_load_returns_consistent_snapshot(tmp_project):
 
 
 def test_phase_key_converts_int_to_str():
-    from lib.state import phase_key
+    from claude_workflow.lib.state import phase_key
     assert phase_key(1) == "1"
     assert phase_key(42) == "42"
 
 
 def test_phase_key_idempotent_on_str():
-    from lib.state import phase_key
+    from claude_workflow.lib.state import phase_key
     assert phase_key("1") == "1"
     assert phase_key("42") == "42"
 
 
 def test_migrate_v1_to_v2_strips_namespace():
-    from lib.state import _migrate_v1_to_v2
+    from claude_workflow.lib.state import _migrate_v1_to_v2
     data = {
         "schema_version": 1,
         "skills_invoked": ["superpowers:brainstorming", "writing-plans"],
@@ -284,7 +289,7 @@ def test_migrate_v1_to_v2_strips_namespace():
 
 def test_migrate_v1_to_v2_dedupes_after_strip():
     """superpowers:brainstorming + brainstorming → only 'brainstorming' once."""
-    from lib.state import _migrate_v1_to_v2
+    from claude_workflow.lib.state import _migrate_v1_to_v2
     data = {
         "schema_version": 1,
         "skills_invoked": ["superpowers:brainstorming", "brainstorming", "superpowers:writing-plans"],
@@ -294,7 +299,7 @@ def test_migrate_v1_to_v2_dedupes_after_strip():
 
 
 def test_migrate_v1_to_v2_preserves_order():
-    from lib.state import _migrate_v1_to_v2
+    from claude_workflow.lib.state import _migrate_v1_to_v2
     data = {
         "schema_version": 1,
         "skills_invoked": ["c", "a", "b", "superpowers:a"],
@@ -305,7 +310,7 @@ def test_migrate_v1_to_v2_preserves_order():
 
 
 def test_migrate_v1_to_v2_handles_empty_skills():
-    from lib.state import _migrate_v1_to_v2
+    from claude_workflow.lib.state import _migrate_v1_to_v2
     data = {"schema_version": 1, "skills_invoked": []}
     result = _migrate_v1_to_v2(data)
     assert result["skills_invoked"] == []
@@ -313,7 +318,7 @@ def test_migrate_v1_to_v2_handles_empty_skills():
 
 
 def test_migrate_v1_to_v2_handles_missing_skills_key():
-    from lib.state import _migrate_v1_to_v2
+    from claude_workflow.lib.state import _migrate_v1_to_v2
     data = {"schema_version": 1}
     result = _migrate_v1_to_v2(data)
     assert result["skills_invoked"] == []
@@ -404,14 +409,14 @@ def test_save_serializes_concurrent_mutations(tmp_project):
 def test_migrate_v1_to_v2_raises_on_v2_input():
     """v3-future guard: calling the v1-only migrator with v2 input must
     raise loudly rather than silently downgrading the schema_version."""
-    from lib.state import _migrate_v1_to_v2
+    from claude_workflow.lib.state import _migrate_v1_to_v2
     with pytest.raises(ValueError, match=r"schema_version=2"):
         _migrate_v1_to_v2({"schema_version": 2, "skills_invoked": []})
 
 
 def test_migrate_v1_to_v2_raises_on_missing_schema_version():
     """Defensive: dict without schema_version is also not v1."""
-    from lib.state import _migrate_v1_to_v2
+    from claude_workflow.lib.state import _migrate_v1_to_v2
     with pytest.raises(ValueError, match=r"schema_version=None"):
         _migrate_v1_to_v2({"skills_invoked": []})
 
@@ -423,7 +428,7 @@ def test_migrate_v1_to_v2_succeeds_on_v1_input():
     files written before ADR 0012, plus the migrator's split(':', 1) semantics
     documented in the function body comment.
     """
-    from lib.state import _migrate_v1_to_v2
+    from claude_workflow.lib.state import _migrate_v1_to_v2
     result = _migrate_v1_to_v2({
         "schema_version": 1,
         "skills_invoked": ["superpowers:brainstorming", "brainstorming"],
@@ -470,8 +475,8 @@ def test_concurrent_v2_migration_only_one_info(tmp_project):
     # let stderr through so caller can capture INFO.
     loader_script = textwrap.dedent(f"""
         import sys
-        sys.path.insert(0, {str(_scripts_dir()) !r})
-        from lib.state import State
+        sys.path.insert(0, {str(_package_parent_dir()) !r})
+        from claude_workflow.lib.state import State
         s = State.load()
         print(s.data["schema_version"])
     """)

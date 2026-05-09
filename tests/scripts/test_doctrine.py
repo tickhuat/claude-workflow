@@ -129,15 +129,13 @@ def fake_doctrine_dir(tmp_path, monkeypatch):
         "Beta intro line.\n"
     )
     monkeypatch.setattr(
-        "lib.state.project_root", lambda: tmp_path
+        "claude_workflow.lib.state.project_root", lambda: tmp_path
     )
     return d
 
 
 def test_list_doctrine_returns_entries(fake_doctrine_dir):
-    import sys
-    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
-    from lib.doctrine import list_doctrine
+    from claude_workflow.lib.doctrine import list_doctrine
 
     entries = list_doctrine()
     titles = {e["title"] for e in entries}
@@ -145,9 +143,7 @@ def test_list_doctrine_returns_entries(fake_doctrine_dir):
 
 
 def test_list_doctrine_summary_is_first_paragraph(fake_doctrine_dir):
-    import sys
-    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
-    from lib.doctrine import list_doctrine
+    from claude_workflow.lib.doctrine import list_doctrine
 
     entries = {e["title"]: e for e in list_doctrine()}
     assert entries["Alpha"]["summary"] == "First paragraph of alpha."
@@ -155,10 +151,8 @@ def test_list_doctrine_summary_is_first_paragraph(fake_doctrine_dir):
 
 
 def test_list_doctrine_empty_when_no_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr("lib.state.project_root", lambda: tmp_path)
-    import sys
-    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
-    from lib.doctrine import list_doctrine
+    monkeypatch.setattr("claude_workflow.lib.state.project_root", lambda: tmp_path)
+    from claude_workflow.lib.doctrine import list_doctrine
 
     assert list_doctrine() == []
 
@@ -166,9 +160,7 @@ def test_list_doctrine_empty_when_no_dir(tmp_path, monkeypatch):
 # ---- _first_paragraph heading-skip behaviour (issue #19) ----
 
 def _import_first_paragraph():
-    import sys
-    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
-    from lib.doctrine import _first_paragraph
+    from claude_workflow.lib.doctrine import _first_paragraph
     return _first_paragraph
 
 

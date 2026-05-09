@@ -10,17 +10,13 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-
-from lib.adr import index_path  # noqa: E402
-from lib.bypass import is_bypassed, log_bypass  # noqa: E402
-from lib.frontmatter import FrontmatterError, parse  # noqa: E402
-from lib.messages import format_block  # noqa: E402
-from lib.skills import GATED_SKILLS as _GATED_SKILLS  # noqa: E402
-from lib.state import State, StateError, project_root  # noqa: E402
+from claude_workflow.lib.adr import index_path
+from claude_workflow.lib.bypass import is_bypassed, log_bypass
+from claude_workflow.lib.frontmatter import FrontmatterError, parse
+from claude_workflow.lib.messages import format_block
+from claude_workflow.lib.skills import GATED_SKILLS as _GATED_SKILLS
+from claude_workflow.lib.state import State, StateError, project_root
 
 
 def _required_adrs(state: State) -> list[str]:

@@ -13,12 +13,9 @@ import re
 import sys
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-
-from lib.frontmatter import parse, FrontmatterError  # noqa: E402
-from lib.skills import SKILL_CLEARS_FLAG  # noqa: E402
-from lib.state import State, StateError, next_stage_after_skill, project_root  # noqa: E402
+from claude_workflow.lib.frontmatter import parse, FrontmatterError
+from claude_workflow.lib.skills import SKILL_CLEARS_FLAG
+from claude_workflow.lib.state import State, StateError, next_stage_after_skill, project_root
 
 
 def _newest(globs: list[str]) -> Path | None:
@@ -160,7 +157,7 @@ def main() -> int:
                 if all_done:
                     s.set_stage("all-phases-verified")
                 else:
-                    from lib.config import load_config
+                    from claude_workflow.lib.config import load_config
                     if load_config().get("auto_advance_phase", True):
                         # Defensive: only advance if n matches current_phase (avoid stale-state jumps)
                         if n != s.data.get("current_phase"):

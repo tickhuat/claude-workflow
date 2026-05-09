@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from lib.frontmatter import parse, FrontmatterError
-from lib.state import project_root
+from claude_workflow.lib.frontmatter import parse, FrontmatterError
+from claude_workflow.lib.state import project_root
 
 
 class ADRError(RuntimeError):

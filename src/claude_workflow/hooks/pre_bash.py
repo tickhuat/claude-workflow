@@ -5,16 +5,12 @@ from __future__ import annotations
 import json
 import re
 import sys
-from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-
-from lib.bypass import is_bypassed, log_bypass  # noqa: E402
-from lib.config import load_config  # noqa: E402
-from lib.git_utils import parse_git_command  # noqa: E402
-from lib.messages import format_block  # noqa: E402
-from lib.state import State, StateError  # noqa: E402
+from claude_workflow.lib.bypass import is_bypassed, log_bypass
+from claude_workflow.lib.config import load_config
+from claude_workflow.lib.git_utils import parse_git_command
+from claude_workflow.lib.messages import format_block
+from claude_workflow.lib.state import State, StateError
 
 
 _COMMIT_RE = re.compile(r"^\s*git\s+commit\b.*?-\w*m\s+(['\"])(.+?)\1", re.DOTALL)
