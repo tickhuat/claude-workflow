@@ -42,6 +42,25 @@ DEFAULTS: dict[str, Any] = {
     ],
     "auto_advance_phase": True,
     "commit_deviation_keyword": "Deviation:",
+    "modes": {
+        "feature": {
+            "required_stages": [
+                "idle",
+                "session-started",
+                "spec-ready",
+                "plan-ready",
+                "exec-running",
+                "all-phases-verified",
+                "reviewed",
+                "done",
+            ],
+            "require_spec": True,
+            "require_plan": True,
+            "require_phase_verify": True,
+            "require_review": True,
+            "sensitive_globs_strict": True,
+        },
+    },
 }
 
 
