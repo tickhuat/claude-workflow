@@ -103,20 +103,22 @@ Switching to a custom mode still requires a `switch-mode-<name>` skill entry in 
 Mode switches are driven by explicit skill invocations, as decided in [ADR 0028](../../ADR/0028-bugfix-mode-prototype.md). Two built-in switch skills are provided:
 
 - `Skill(switch-mode-bugfix)` — sets `state.mode = "bugfix"` and advances the stage to `exec-running`.
-- `Skill(switch-mode-feature)` — sets `state.mode = "feature"` and advances the stage to `brainstorming`.
+- `Skill(switch-mode-feature)` — sets `state.mode = "feature"` and advances the stage to `session-started` (the next valid stage from which `Skill(brainstorming)` can be invoked).
 
 These are registered in `lib/skills.py:SKILL_TO_STAGE`:
 
 ```python
 "switch-mode-bugfix":  {"idle": "exec-running", "done": "exec-running"},
-"switch-mode-feature": {"idle": "brainstorming", "done": "brainstorming"},
+"switch-mode-feature": {"idle": "session-started", "done": "session-started"},
 ```
 
-**Mid-flow switches are forbidden.** `switch-mode-*` skills are only valid when `state.stage` is `idle` or `done`. Attempting to switch mode from any other stage (e.g., `spec-ready`, `exec-running`, `reviewed`) is blocked by `pre_skill.py`. The reason: switching mode after a spec or plan has been started would leave `current_spec` or `current_plan` set while the new mode's gate booleans contradict their presence, causing state confusion and potential data loss ([ADR 0028](../../ADR/0028-bugfix-mode-prototype.md)).
+The companion table `lib/skills.py:MODE_SWITCH_SKILLS` maps each switch skill to the mode it activates. `post_skill` reads this table to write `state.mode` atomically with the stage transition, and `pre_skill` reads it to bypass the current-mode `required_stages` gate (because the target stage belongs to a *different* mode's flow — validating it against the current mode's stages would falsely block legitimate switches).
 
-The implementation uses the existing `_try_transition()` machinery in `pre_skill.py` — no new transition mechanism is introduced. `switch-mode-bugfix` is simply another skill name that maps to a stage transition, in the same pattern as `brainstorming` mapping `session-started → spec-ready`.
+**Mid-flow switches are forbidden.** `switch-mode-*` skills are only valid when `state.stage` is `idle` or `done`. Attempting to switch mode from any other stage (`spec-ready`, `plan-ready`, `exec-running`, `reviewed`, …) yields `next_stage_after_skill -> None`, which `post_skill` treats as no-op (state unchanged). The reason: switching mode after a spec or plan has been started would leave `current_spec` / `current_plan` set while the new mode's gate booleans contradict their presence ([ADR 0028](../../ADR/0028-bugfix-mode-prototype.md)).
 
-Note on implementation status: the `switch-mode-*` skills and their `SKILL_TO_STAGE` entries are being implemented in Phase 4 of Round 4 and are not yet shipped.
+The implementation reuses the existing `_try_transition()` machinery in `post_skill.py` — no new transition mechanism is introduced. `switch-mode-bugfix` is just another skill name that maps to a stage transition, in the same pattern as `brainstorming` mapping `session-started -> spec-ready`.
+
+Implementation status: shipped in Round 4 Phase 4.
 
 ---
 
@@ -144,16 +146,18 @@ All three hooks fail open on an unknown mode name — they print a `[WARN by dev
 
 ---
 
-## `bugfix` mode
+## bugfix mode
 
-`bugfix` is the first non-default mode, prototyped per [ADR 0028](../../ADR/0028-bugfix-mode-prototype.md). It targets the common situation where a known bug needs to be fixed without full spec/plan ceremony, while still enforcing code review and protecting sensitive paths.
-
-Full YAML record (to be added to `dev-rules.config.yaml` in Phase 4 of Round 4):
+`bugfix` is the first non-default mode shipped (Round 4 Phase 4, [ADR 0028](../../ADR/0028-bugfix-mode-prototype.md)). It encodes a short cycle for small, well-understood bug fixes: no spec, no plan, no per-phase verification — but code review is still required, and sensitive paths (`auth*`, `migrations/**`, `*.config.*`) still need a new ADR.
 
 ```yaml
 modes:
   bugfix:
-    required_stages: [idle, exec-running, reviewed, done]
+    required_stages:
+      - idle
+      - exec-running
+      - reviewed
+      - done
     require_spec: false
     require_plan: false
     require_phase_verify: false
@@ -161,15 +165,18 @@ modes:
     sensitive_globs_strict: true
 ```
 
-What this means in practice:
+The 4-stage flow runs:
 
-- `required_stages` skips `session-started`, `spec-ready`, `plan-ready`, and `all-phases-verified`. After `Skill(switch-mode-bugfix)`, the stage jumps directly to `exec-running`. Once implementation is done, the cycle goes directly to `reviewed`, then `done`.
-- `require_spec: false` and `require_plan: false` — `pre_edit.py` does not block for missing spec or plan files. The developer can edit immediately after the mode switch.
-- `require_phase_verify: false` — `pre_skill.py` does not enforce `VERIFY-PASS` signals between phases. A bugfix is typically a single cohesive change, not a multi-phase plan.
-- `require_review: true` — code review is still required. `pre_skill.py` gates `finishing-a-development-branch` on the stage reaching `reviewed`. A bug fix without review risks shipping a regression.
-- `sensitive_globs_strict: true` — edits to `auth*`, `schema*`, `migrations/**`, or `*.config.*` still require a new ADR. Bug fixes on security-sensitive code are exactly the situation where a written decision record is most valuable ([ADR 0028](../../ADR/0028-bugfix-mode-prototype.md)).
+```text
+idle  -- Skill(switch-mode-bugfix) -->  exec-running
+     -- (edit code, debug as needed) -->  exec-running
+     -- Skill(requesting-code-review) -->  reviewed
+     -- Skill(finishing-a-development-branch) -->  done
+```
 
-**When to use `bugfix` mode:** the cycle begins with a known, reproducible bug (not a feature request, not a refactor). The fix is localized — you know what to change and can state the change without a formal spec. If the fix grows beyond the original scope during implementation, consider returning to `idle` and restarting in `feature` mode with a proper spec.
+The transition from `exec-running` to `reviewed` requires the `requesting-code-review` skill to have an entry for `exec-running` as a source stage. Round 4 Phase 4 added this entry: `requesting-code-review` now maps both `all-phases-verified -> reviewed` (feature mode path) and `exec-running -> reviewed` (bugfix mode path). Feature mode users could in theory also take the new path and skip phase-by-phase verification; this is acknowledged out-of-scope and tracked as a follow-up.
+
+To switch into bugfix mode, run `Skill(switch-mode-bugfix)` from `idle` (start of session) or `done` (immediately after finishing a previous cycle). To switch back out, run `Skill(switch-mode-feature)`.
 
 ---
 

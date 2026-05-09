@@ -70,3 +70,79 @@ def test_using_git_worktrees_not_in_skill_to_stage_table():
     """The entry must be removed entirely (not just set to empty)."""
     from claude_workflow.lib.skills import SKILL_TO_STAGE
     assert "using-git-worktrees" not in SKILL_TO_STAGE
+
+
+def test_mode_switch_skills_table_shape():
+    """MODE_SWITCH_SKILLS maps switch-mode-<name> -> <name> for each registered mode-switch skill."""
+    from claude_workflow.lib.skills import MODE_SWITCH_SKILLS
+    assert MODE_SWITCH_SKILLS == {
+        "switch-mode-bugfix": "bugfix",
+        "switch-mode-feature": "feature",
+    }
+
+
+def test_switch_mode_bugfix_transitions_idle_and_done_to_exec_running():
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("switch-mode-bugfix", "idle") == "exec-running"
+    assert next_stage_after_skill("switch-mode-bugfix", "done") == "exec-running"
+
+
+def test_switch_mode_feature_transitions_idle_and_done_to_session_started():
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("switch-mode-feature", "idle") == "session-started"
+    assert next_stage_after_skill("switch-mode-feature", "done") == "session-started"
+
+
+def test_switch_mode_skills_blocked_mid_flow():
+    """Mid-flow lock: switch-mode-* must return None for any stage other than idle/done.
+    The mid-flow lock is enforced by the SKILL_TO_STAGE table itself (no entries
+    for other source stages). See ADR 0028."""
+    from claude_workflow.lib.skills import next_stage_after_skill
+    mid_flow_stages = [
+        "session-started", "spec-ready", "plan-ready",
+        "exec-running", "all-phases-verified", "reviewed",
+        "phase-1-done", "phase-1-verified",
+    ]
+    for stage in mid_flow_stages:
+        assert next_stage_after_skill("switch-mode-bugfix", stage) is None, \
+            f"switch-mode-bugfix should not transition from {stage}"
+        assert next_stage_after_skill("switch-mode-feature", stage) is None, \
+            f"switch-mode-feature should not transition from {stage}"
+
+
+def test_mode_switch_skills_keys_align_with_skill_to_stage():
+    """Every key in MODE_SWITCH_SKILLS must also be in SKILL_TO_STAGE (kept in sync)."""
+    from claude_workflow.lib.skills import MODE_SWITCH_SKILLS, SKILL_TO_STAGE
+    for skill in MODE_SWITCH_SKILLS:
+        assert skill in SKILL_TO_STAGE, f"{skill!r} in MODE_SWITCH_SKILLS but not SKILL_TO_STAGE"
+
+
+def test_requesting_code_review_accepts_exec_running_for_bugfix_mode():
+    """Phase 4 / ADR 0028: bugfix mode (required_stages: [idle, exec-running,
+    reviewed, done]) reaches `reviewed` directly from `exec-running` without
+    going through `all-phases-verified`. The new exec-running -> reviewed
+    entry is what makes that transition resolvable."""
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("requesting-code-review", "exec-running") == "reviewed"
+
+
+def test_requesting_code_review_still_supports_all_phases_verified():
+    """Feature mode: requesting-code-review still maps all-phases-verified -> reviewed."""
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("requesting-code-review", "all-phases-verified") == "reviewed"
+
+
+def test_mode_switch_skills_have_only_idle_and_done_source_stages():
+    """ADR 0028 mid-flow lock (M-A cascade-audit minor): the SKILL_TO_STAGE
+    entries for switch-mode-* skills must list ONLY {idle, done} as source
+    stages. Any other source would silently break mid-flow protection — a
+    contributor adding `"switch-mode-foo": {"spec-ready": "..."}` would
+    pass the existing alignment test but break the lock invariant."""
+    from claude_workflow.lib.skills import MODE_SWITCH_SKILLS, SKILL_TO_STAGE
+    expected_sources = {"idle", "done"}
+    for skill in MODE_SWITCH_SKILLS:
+        sources = set(SKILL_TO_STAGE[skill].keys())
+        assert sources == expected_sources, (
+            f"{skill!r} has source stages {sources}; mid-flow lock requires "
+            f"exactly {expected_sources}"
+        )

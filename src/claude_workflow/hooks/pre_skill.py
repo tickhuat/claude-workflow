@@ -17,7 +17,7 @@ from claude_workflow.lib.frontmatter import FrontmatterError, parse
 from claude_workflow.lib.messages import format_block
 from claude_workflow.lib.modes import current_mode_config
 from claude_workflow.lib.skills import GATED_SKILLS as _GATED_SKILLS
-from claude_workflow.lib.skills import next_stage_after_skill
+from claude_workflow.lib.skills import MODE_SWITCH_SKILLS, next_stage_after_skill
 from claude_workflow.lib.state import State, StateError, project_root
 
 
@@ -94,7 +94,15 @@ def main() -> int:
     # has a SKILL_TO_STAGE transition; skills without a transition (e.g.
     # using-git-worktrees per ADR 0020) get target=None and are exempt.
     target = next_stage_after_skill(skill, s.data["stage"])
-    if target is not None:
+    if target is not None and skill not in MODE_SWITCH_SKILLS:
+        # Mode-switching skills (ADR 0028) are exempt: their target stage
+        # belongs to a *different* mode's flow, so validating against the
+        # current mode's required_stages would falsely block legitimate
+        # switches (e.g. switch-mode-feature from done while state.mode=bugfix
+        # lands at session-started, which is not in bugfix's required_stages).
+        # Mid-flow lock is enforced upstream: SKILL_TO_STAGE only has entries
+        # for source stages {idle, done}, so any other stage produces target=None
+        # and this branch is skipped entirely.
         mc = current_mode_config(s)
         rs = mc.required_stages
         if target not in rs:
@@ -116,6 +124,31 @@ def main() -> int:
                 problem=f"mode={mc.name!r}: stage {cur!r} → {target!r} 不是向前 transition (required_stages 是有序的)。",
                 stage=cur,
                 actions=[f"確認 mode 對應的 stage 順序，或更換 skill"],
+            ), file=sys.stderr)
+            return 2
+        # Cascade audit I-4: when the active mode requires per-phase
+        # verification, transitions must be CONSECUTIVE in required_stages
+        # (no skipping intermediate stages). Without this, the new
+        # `requesting-code-review[exec-running]: reviewed` mapping (added
+        # for bugfix mode) lets feature-mode users skip
+        # `all-phases-verified` and bypass phase verification entirely.
+        # bugfix mode (require_phase_verify=False) is naturally exempt.
+        if (
+            cur in rs
+            and mc.require_phase_verify
+            and rs.index(target) > rs.index(cur) + 1
+        ):
+            skipped = rs[rs.index(cur) + 1: rs.index(target)]
+            print(format_block(
+                problem=(
+                    f"mode={mc.name!r} 要求 phase 驗證: stage {cur!r} → {target!r} "
+                    f"跳過了中間 stages {skipped!r}。"
+                ),
+                stage=cur,
+                actions=[
+                    f"先把流程帶到 {skipped[0]!r}（通常透過 VERIFY-PASS phase=N 自動推進）",
+                    "或切換到不要求 phase 驗證的 mode（例如 bugfix）",
+                ],
             ), file=sys.stderr)
             return 2
 

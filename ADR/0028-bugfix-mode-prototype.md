@@ -65,3 +65,15 @@ supersedes: null
 - **Follow-up**:
   - Phase 4 落地（switch-mode skill、bugfix YAML、mid-flow lock enforcement、e2e test）
   - 跑穩後（建議 ≥1 個月真實 bugfix 使用）再開 issue 討論 chore / iterate / hotfix 三個 mode
+
+## Addendum (2026-05-10): switch-mode-feature target stage corrected
+
+§1 and §3 (the SKILL_TO_STAGE snippet) wrote the target as `"brainstorming"` for `switch-mode-feature`. `brainstorming` is a skill name, not a stage in `_STAGE_ORDER` (the sequence is `idle → session-started → spec-ready → ...`). The intended semantic was always "land at the stage from which `Skill(brainstorming)` can be invoked", which is `session-started`.
+
+Phase 4 brainstorm resolved this as Q1 = α and Phase 4 shipped the corrected mapping:
+
+```python
+"switch-mode-feature": {"idle": "session-started", "done": "session-started"},
+```
+
+The original ADR text is preserved above for point-in-time accuracy; the as-shipped behaviour is documented in `docs/doctrine/mode-model.md` and `docs/doctrine/state-machine.md`.

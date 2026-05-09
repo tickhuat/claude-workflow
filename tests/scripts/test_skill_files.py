@@ -55,6 +55,40 @@ def test_cascade_auditing_prompt_has_placeholders() -> None:
         assert placeholder in prompt, f"cascade-prompt.md missing placeholder: {placeholder}"
 
 
+TEMPLATES_SKILLS_DIR = REPO_ROOT / "templates" / ".claude" / "skills"
+
+EXPECTED_TEMPLATE_SKILLS = [
+    pytest.param("switch-mode-bugfix", id="switch_mode_bugfix"),
+    pytest.param("switch-mode-feature", id="switch_mode_feature"),
+]
+
+
+@pytest.mark.parametrize("skill_name", EXPECTED_TEMPLATE_SKILLS)
+def test_template_skill_directory_exists(skill_name: str) -> None:
+    assert (TEMPLATES_SKILLS_DIR / skill_name).is_dir(), f"templates/{skill_name} dir missing"
+
+
+@pytest.mark.parametrize("skill_name", EXPECTED_TEMPLATE_SKILLS)
+def test_template_skill_md_frontmatter_valid(skill_name: str) -> None:
+    skill_md = TEMPLATES_SKILLS_DIR / skill_name / "SKILL.md"
+    assert skill_md.exists(), f"{skill_md} missing"
+    fm = _parse_frontmatter(skill_md)
+    assert fm.get("name") == skill_name, (
+        f"frontmatter.name mismatch: {fm.get('name')!r} != {skill_name!r}"
+    )
+    assert isinstance(fm.get("description"), str) and fm["description"].strip(), \
+        "frontmatter.description must be non-empty string"
+
+
+@pytest.mark.parametrize("skill_name", EXPECTED_TEMPLATE_SKILLS)
+def test_template_skill_md_body_not_empty(skill_name: str) -> None:
+    skill_md = TEMPLATES_SKILLS_DIR / skill_name / "SKILL.md"
+    text = skill_md.read_text(encoding="utf-8")
+    # Body is everything after the closing --- of frontmatter
+    _open, _fm, body = text.split("---\n", 2)
+    assert body.strip(), f"{skill_md}: SKILL.md body should not be empty"
+
+
 def test_cascade_auditing_uses_documented_subagent_type() -> None:
     """Contract test: cascade-auditing dispatches via `general-purpose` subagent_type.
 

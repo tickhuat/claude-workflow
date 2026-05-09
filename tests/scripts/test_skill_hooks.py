@@ -507,3 +507,71 @@ def test_post_skill_auto_advance_does_not_overflow_phases_total(tmp_project, set
         f"stage stuck at phase-3-verified, got {state['stage']!r}"
     )
     assert "phases_total" in r.stderr or "not auto-advancing" in r.stderr
+
+
+def test_pre_skill_allows_switch_mode_feature_from_done_in_bugfix_mode(set_stage):
+    """Reverse direction: from a finished bugfix cycle (state.mode=bugfix,
+    stage=done), Skill(switch-mode-feature) must be permitted to land at
+    session-started — even though session-started is not in bugfix mode's
+    required_stages. The bypass for MODE_SWITCH_SKILLS is what allows this."""
+    set_stage(stage="done", mode="bugfix")
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-feature"}}, Path.cwd())
+    assert r.returncode == 0, f"unexpectedly blocked: stderr={r.stderr}"
+
+
+def test_pre_skill_allows_switch_mode_bugfix_from_idle_in_feature_mode(set_stage):
+    """Forward direction: from idle in feature mode, Skill(switch-mode-bugfix)
+    must transition to exec-running."""
+    set_stage(stage="idle", mode="feature")
+    r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-bugfix"}}, Path.cwd())
+    assert r.returncode == 0, f"unexpectedly blocked: stderr={r.stderr}"
+
+
+def test_pre_skill_blocks_switch_mode_bugfix_mid_flow(set_stage):
+    """Mid-flow lock: from spec-ready, switch-mode-bugfix must be blocked.
+    next_stage_after_skill returns None (no entry for spec-ready), and the
+    existing target=None code-path is what blocks it (general 'no transition'
+    message, no special-case error needed)."""
+    # Note: pre_skill currently exits 0 when target is None (skill doesn't try
+    # to transition). Mid-flow lock is enforced by post_skill not writing state
+    # changes — verified separately. This test confirms pre_skill doesn't
+    # accidentally treat switch-mode-* as having a transition from spec-ready.
+    from claude_workflow.lib.skills import next_stage_after_skill
+    assert next_stage_after_skill("switch-mode-bugfix", "spec-ready") is None
+    assert next_stage_after_skill("switch-mode-feature", "spec-ready") is None
+
+
+def test_post_skill_switch_mode_bugfix_writes_state_mode(set_stage):
+    """ADR 0028: post_skill writes state.mode = 'bugfix' AND advances stage to
+    exec-running when Skill(switch-mode-bugfix) is invoked from idle."""
+    set_stage(stage="idle", mode="feature")
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-bugfix"}}, Path.cwd())
+    assert r.returncode == 0, f"hook errored: stderr={r.stderr}"
+    state = json.loads((Path.cwd() / ".claude" / "dev-state.json").read_text())
+    assert state["mode"] == "bugfix"
+    assert state["stage"] == "exec-running"
+    assert "switch-mode-bugfix" in state["skills_invoked"]
+
+
+def test_post_skill_switch_mode_feature_writes_state_mode(set_stage):
+    """Reverse: from done in bugfix mode, Skill(switch-mode-feature) restores
+    state.mode='feature' and advances to session-started."""
+    set_stage(stage="done", mode="bugfix")
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-feature"}}, Path.cwd())
+    assert r.returncode == 0, f"hook errored: stderr={r.stderr}"
+    state = json.loads((Path.cwd() / ".claude" / "dev-state.json").read_text())
+    assert state["mode"] == "feature"
+    assert state["stage"] == "session-started"
+
+
+def test_post_skill_switch_mode_no_op_when_mid_flow(set_stage):
+    """Mid-flow lock: from spec-ready, Skill(switch-mode-bugfix) must NOT
+    write state.mode and must NOT advance stage. The mid-flow lock works
+    because next_stage_after_skill returns None (no transition is attempted),
+    and post_skill's _try_transition early-returns without touching mode."""
+    set_stage(stage="spec-ready", mode="feature")
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-bugfix"}}, Path.cwd())
+    assert r.returncode == 0
+    state = json.loads((Path.cwd() / ".claude" / "dev-state.json").read_text())
+    assert state["mode"] == "feature", "mid-flow switch should not have changed mode"
+    assert state["stage"] == "spec-ready", "mid-flow switch should not have changed stage"

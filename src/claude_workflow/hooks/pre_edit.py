@@ -197,11 +197,20 @@ def _handle_deviation(rel: str, s: State, stage: str, cur_phase: int) -> tuple[i
     return (0, dirty)
 
 
-def _check_exec_stage(rel: str, s: State, stage: str) -> tuple[int, bool] | None:
+def _check_exec_stage(rel: str, s: State, stage: str, require_plan: bool) -> tuple[int, bool] | None:
     """Exec-stage rules. Returns (rc, dirty) where dirty=True if state was mutated.
     Returns None if not in exec stage."""
     if not _is_exec_stage(stage):
         return None
+
+    # ADR 0028 cascade-audit C-1: modes that don't require a plan (bugfix and
+    # any future plan-less mode) have no target_files / no current_phase to
+    # compare against. Without this short-circuit, the deviation counter would
+    # treat every src/ edit as outside-plan and block the third unique file —
+    # silently breaking the core promise of bugfix mode.
+    # Sensitive-globs protection (handled earlier in main) is unaffected.
+    if not require_plan:
+        return (0, False)
 
     cur_phase = s.data.get("current_phase") or 0
     targets = _current_phase_targets(s)
@@ -300,7 +309,7 @@ def main() -> int:
     if (rc := _check_stage_gating(rel, stage, mode.require_spec, mode.require_plan)) is not None:
         return _finalize(rc, dirty, s)
 
-    exec_result = _check_exec_stage(rel, s, stage)
+    exec_result = _check_exec_stage(rel, s, stage, mode.require_plan)
     if exec_result is not None:
         rc, exec_dirty = exec_result
         return _finalize(rc, dirty or exec_dirty, s)

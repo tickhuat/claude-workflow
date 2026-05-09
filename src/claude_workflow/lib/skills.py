@@ -17,9 +17,13 @@ SKILL_TO_STAGE: dict[str, dict[str, str]] = {
     "subagent-driven-development": {"plan-ready": "exec-running", "exec-prep": "exec-running"},
     # using-git-worktrees deliberately omitted (ADR 0020): it's a tool action,
     # not a state transition. record_skill() still tracks invocation.
-    "requesting-code-review": {"all-phases-verified": "reviewed"},
+    "requesting-code-review": {"all-phases-verified": "reviewed", "exec-running": "reviewed"},
     "finishing-a-development-branch": {"reviewed": "done"},
     "using-superpowers": {"idle": "session-started"},
+    # ADR 0028: mode-switching skills. Only {idle, done} as valid source stages
+    # is intentional — it enforces the mid-flow lock at the data-layer.
+    "switch-mode-bugfix": {"idle": "exec-running", "done": "exec-running"},
+    "switch-mode-feature": {"idle": "session-started", "done": "session-started"},
 }
 
 
@@ -27,6 +31,18 @@ EVENT_FLAG_TO_SKILL: dict[str, str] = {
     "debug_required": "systematic-debugging",
     "parallel_required": "dispatching-parallel-agents",
     "review_required": "receiving-code-review",
+}
+
+
+# Skills that change the active mode. Single source of truth for:
+#   (a) post_skill writing state.mode (skill name -> mode name)
+#   (b) pre_skill bypassing the current-mode required_stages gate for these
+#       skills (target stage belongs to a *different* mode's flow).
+# Mid-flow lock is enforced by SKILL_TO_STAGE only listing {idle, done} as
+# valid source stages — other stages produce next_stage_after_skill -> None.
+MODE_SWITCH_SKILLS: dict[str, str] = {
+    "switch-mode-bugfix": "bugfix",
+    "switch-mode-feature": "feature",
 }
 
 

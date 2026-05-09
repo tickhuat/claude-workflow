@@ -57,12 +57,22 @@ SKILL_TO_STAGE = {
                                        "exec-prep": "exec-running"},
     "subagent-driven-development":    {"plan-ready": "exec-running",
                                        "exec-prep": "exec-running"},
-    "requesting-code-review":         {"all-phases-verified": "reviewed"},
+    "requesting-code-review":         {"all-phases-verified": "reviewed",
+                                       "exec-running": "reviewed"},  # bugfix-mode path
     "finishing-a-development-branch": {"reviewed": "done"},
+    # Mode-switching skills (ADR 0028); see docs/doctrine/mode-model.md.
+    # These bypass the active mode's required_stages gate in pre_skill.py
+    # because their target belongs to a *different* mode's flow.
+    "switch-mode-bugfix":             {"idle": "exec-running",
+                                       "done": "exec-running"},     # → mode=bugfix
+    "switch-mode-feature":            {"idle": "session-started",
+                                       "done": "session-started"},  # → mode=feature
 }
 ```
 
 Each entry maps `current_stage → next_stage`. If the current stage is not in the inner dict, `next_stage_after_skill` returns `None` and no transition occurs — invoking `brainstorming` from `exec-running` is silently ignored rather than blocked, because the skill itself is already complete. Gate-checking (whether you are allowed to invoke the skill at all) is done by `pre_skill.py` separately.
+
+**`requesting-code-review` has two source stages.** `all-phases-verified → reviewed` is the feature-mode path (after every plan phase has emitted `VERIFY-PASS`). `exec-running → reviewed` is the bugfix-mode path (no per-phase verification). Which path is legitimate is enforced by the active mode's `required_stages` list — see [mode-model.md](mode-model.md). The mode-switching skills `switch-mode-bugfix` and `switch-mode-feature` are similarly mode-aware: `pre_skill.py` reads `lib/skills.py:MODE_SWITCH_SKILLS` and bypasses the `required_stages` gate for these skills, because their target stage belongs to a *different* mode's flow.
 
 **`using-git-worktrees` is deliberately absent from `SKILL_TO_STAGE`** ([ADR 0020](../../ADR/0020-using-git-worktrees-noop-transition.md)). Building a git worktree is a tool action — isolating a workspace — not a workflow state transition. It may be called at any stage (mid-brainstorm, mid-phase, post-review) without affecting the stage. `post_skill.py` still records the invocation in `skills_invoked` for audit purposes; only the transition step is skipped.
 
@@ -93,25 +103,24 @@ Phase tracking fields in the state:
 
 ## State schema
 
-`dev-state.json` is defined by `INITIAL_STATE` in `lib/state.py`. Current schema version: **2** (see Schema Migration Policy below). Fields:
+`dev-state.json` is defined by `INITIAL_STATE` in `lib/state.py`. Current schema version: **3** (see Schema Migration Policy below). Fields:
 
 | Field | Type | Description |
 |---|---|---|
-| `schema_version` | int | Migration guard; currently 2 ([ADR 0010](../../ADR/0010-state-schema-version.md)) |
+| `schema_version` | int | Migration guard; currently 3 ([ADR 0010](../../ADR/0010-state-schema-version.md)) |
 | `stage` | str | Current workflow stage (validated by `is_valid_stage`) |
+| `mode` | str | Active workflow mode (e.g. `"feature"`, `"bugfix"`); default `"feature"` ([ADR 0027](../../ADR/0027-mode-model-first-class.md)) |
 | `current_spec` | str \| null | Path to the active spec file |
 | `current_plan` | str \| null | Path to the active plan file |
 | `current_phase` | int | Active phase number within `exec-running` |
 | `phases_total` | int | Total phases in the active plan |
-| `phases_verified` | list[int] | Phases that have passed verification |
+| `phases_verified` | list[int] | Phase IDs that have passed verification |
 | `skills_invoked` | list[str] | Ordered list of bare skill names invoked this session |
 | `adrs_read` | list[str] | ADR slugs confirmed read by the pre-skill gate |
 | `deviation_log` | list[dict] | Records of files touched outside `target_files` per phase |
 | `event_flags` | dict | Per-prompt detection flags; see Event Flags section |
 | `phase_files_touched` | dict[str, list[str]] | Runtime-populated; not in INITIAL_STATE — set via `setdefault` per phase (populated by `post_edit.py`) |
 | `last_transition` | str \| null | ISO-8601 UTC timestamp of the most recent stage change |
-
-**Planned addition:** A `mode` field will be added in schema v3 per [ADR 0027](../../ADR/0027-mode-model-first-class.md) (multi-mode workflow). It will carry the active workflow mode (e.g., `"feature"`, `"bugfix"`); default `"feature"`.
 
 `State.load()` applies forward-compat auto-fill: any field present in `INITIAL_STATE` but missing from the on-disk JSON is filled with its default value before returning. This means adding a new field to `INITIAL_STATE` automatically handles older state files without requiring a schema migration, as long as the field's type and semantics are additive. Structural changes (renaming keys, changing value types) still require a versioned migration.
 
@@ -130,8 +139,9 @@ The `schema_version` field was introduced in [ADR 0010](../../ADR/0010-state-sch
 Current migrations:
 
 - **v1 → v2** ([ADR 0018](../../ADR/0018-state-schema-v2-migration.md)): strips `superpowers:` namespace prefixes from `skills_invoked` entries and deduplicates the list while preserving insertion order. This was necessary because [ADR 0012](../../ADR/0012-strip-skill-namespace-prefix.md) began stripping prefixes at the hook entry point, but existing state files retained the old namespaced entries. The migrator (`_migrate_v1_to_v2`) validates it was called with `schema_version == 1` to prevent accidental misuse by future migrators.
+- **v2 → v3** ([ADR 0027](../../ADR/0027-mode-model-first-class.md)): adds the `mode` field to `INITIAL_STATE`, defaulting any existing state file to `"feature"`. Required because Round 4 introduced multi-mode workflows; older state files have no `mode` and would otherwise crash mode-aware hook gating.
 
-Future migrations follow the same pattern: add `_migrate_v2_to_v3`, bump `INITIAL_STATE["schema_version"]` to 3, write an ADR.
+Future migrations follow the same pattern: add `_migrate_v3_to_v4`, bump `INITIAL_STATE["schema_version"]` to 4, write an ADR.
 
 ---
 
