@@ -80,7 +80,7 @@ Note on implementation status: the `modes:` YAML structure is decided (per [ADR 
 
 ## Adding a custom mode
 
-Fork users can add a new mode to `dev-rules.config.yaml` without modifying any Python code. The `modes:` section is part of the stable extension surface defined in [ADR 0030](../../ADR/0030-stable-extension-surface.md): the `.claude/dev-rules.config.yaml` schema is stable and fork-overridable, in the same pattern as the `stages:`, `global_whitelist:`, and `sensitive_globs:` sections established in [ADR 0007](../../ADR/0007-config-driven-stage-names.md) and [ADR 0015](../../ADR/0015-config-defaults-consistency.md).
+Fork users can add a new mode to `dev-rules.config.yaml` without modifying any Python code. The `modes:` section is part of the stable extension surface defined in [ADR 0030](../../ADR/0030-distribution-pypi-architecture.md): the `.claude/dev-rules.config.yaml` schema is stable and fork-overridable, in the same pattern as the `stages:`, `global_whitelist:`, and `sensitive_globs:` sections established in [ADR 0007](../../ADR/0007-dev-rules-config-externalization.md) and [ADR 0015](../../ADR/0015-defaults-yaml-sync.md).
 
 To add a custom mode:
 

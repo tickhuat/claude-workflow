@@ -135,9 +135,9 @@ The motivation was a PyYAML 1.1 octal-parsing trap: bare numbers in YAML such as
 
 ## Doctrine injection
 
-Per [ADR 0026](../../ADR/0026-switch-adrs-to-doctrine-docs.md), `on_user_prompt.py` injects doctrine documentation from `docs/doctrine/*.md` (not `ADR/_index.json`) into the prompt system context.
+Per [ADR 0026](../../ADR/0026-framework-doctrine-separation.md), `on_user_prompt.py` injects doctrine documentation from `docs/doctrine/*.md` (not `ADR/_index.json`) into the prompt system context.
 
-The source is enumerated by `list_doctrine()` from `lib/doctrine.py`, which scans `docs/doctrine/` for `.md` files and returns them in dependency order (files that are referenced by others are listed first). The injection builds a summary of framework rules and current system state at the start of each user turn.
+The source is enumerated by `list_doctrine()` from `lib/doctrine.py`, which scans `docs/doctrine/` for `.md` files and returns them in alphabetical order by filename. The injection builds a summary of framework rules and current system state at the start of each user turn.
 
 Unlike ADRs (which have a `status` field used to filter at injection time), doctrine docs have no status field — they are the current, authoritative description of framework behavior and require no filtering. All doctrine files in `docs/doctrine/` are injected as-is.
 
