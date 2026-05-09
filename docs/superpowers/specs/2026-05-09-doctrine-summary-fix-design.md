@@ -46,7 +46,9 @@ Drafts (each ~200–300 chars):
 
 ### C. Structural test (regression guard)
 
-Extend `tests/scripts/test_doctrine.py` with a parametrized test asserting that `_first_paragraph(body)` for each doctrine doc is non-empty AND does not start with `#`. This catches future doctrine doc authors who skip the intro.
+Extend `tests/scripts/test_doctrine.py` with a parametrized test asserting that the **first non-empty chunk** of each doctrine doc's body is non-empty AND does not start with `#`. This catches future doctrine doc authors who skip the intro.
+
+Implementation note: the test inspects the raw first chunk directly rather than calling `_first_paragraph()`. `_first_paragraph()` skips heading chunks and would silently pass a doc shaped `## Heading\n\nProse`, masking the position invariant. The structural test guards intro **position** (before any heading), not just intro existence.
 
 ## Components
 
@@ -80,11 +82,13 @@ Unchanged. No qualifying chunk → return `""`. `list_doctrine()` continues to s
 
 ### Structural test (added)
 
-`test_doctrine_has_intro_prose` — parametrized over the 6 doctrine docs. For each doc:
+`test_doctrine_doc_has_intro_prose` — parametrized over the 6 doctrine docs (reuses `EXPECTED_DOCTRINE`). For each doc:
 - Parse frontmatter, get body
-- Compute `_first_paragraph(body)`
+- Take the first non-empty chunk of `body.split("\n\n")` directly (no `_first_paragraph` call)
 - Assert non-empty
 - Assert does not start with `#`
+
+Direct first-chunk inspection — not `_first_paragraph` — is intentional. See §C implementation note.
 
 ### Live verification
 
