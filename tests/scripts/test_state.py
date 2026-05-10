@@ -626,3 +626,85 @@ def test_load_does_not_re_migrate_when_schema_version_is_3(tmp_project, capsys):
     s = State.load()
     assert s.data["schema_version"] == 3
     assert "v2 → v3" not in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# Issue #13 — project_root() must resolve to the worktree, not the parent repo
+# ---------------------------------------------------------------------------
+# Bug: hooks resolve project_root() via CLAUDE_PROJECT_DIR (set by Claude Code
+# at session start = parent repo). When the user is editing inside a worktree
+# under .worktrees/<branch>/, every Edit gets path-prefixed with .worktrees/...
+# and stops matching plan target_files (false-positive deviation flags). Fix:
+# resolve via `git rev-parse --show-toplevel` first (returns the worktree).
+
+
+def _git(*args, cwd):
+    """Helper: run a git command, raise on failure."""
+    import subprocess
+    subprocess.run(
+        ["git", *args],
+        cwd=str(cwd),
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_project_root_resolves_worktree_via_git_toplevel(tmp_path, monkeypatch):
+    """Regression for #13: cwd inside a worktree -> worktree path, not env."""
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    _git("init", "-q", "-b", "main", cwd=parent)
+    _git("config", "user.email", "test@example.com", cwd=parent)
+    _git("config", "user.name", "test", cwd=parent)
+    _git("commit", "--allow-empty", "-q", "-m", "init", cwd=parent)
+
+    worktree = tmp_path / "wt"
+    _git("worktree", "add", "-q", "-b", "feature/issue-13-test", str(worktree), cwd=parent)
+
+    # Simulate Claude Code: CLAUDE_PROJECT_DIR points at parent, cwd is worktree.
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(parent))
+    monkeypatch.chdir(worktree)
+
+    from claude_workflow.lib.state import project_root
+    assert project_root() == worktree.resolve()
+
+
+def test_project_root_returns_main_repo_when_no_worktree(tmp_path, monkeypatch):
+    """Inside a regular (non-worktree) repo, project_root returns the repo."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git("init", "-q", "-b", "main", cwd=repo)
+    _git("config", "user.email", "test@example.com", cwd=repo)
+    _git("config", "user.name", "test", cwd=repo)
+    _git("commit", "--allow-empty", "-q", "-m", "init", cwd=repo)
+
+    # Even if CLAUDE_PROJECT_DIR points elsewhere, git toplevel wins inside a repo.
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path / "elsewhere"))
+    monkeypatch.chdir(repo)
+
+    from claude_workflow.lib.state import project_root
+    assert project_root() == repo.resolve()
+
+
+def test_project_root_falls_back_to_env_outside_git(tmp_path, monkeypatch):
+    """Outside any git repo, fall back to CLAUDE_PROJECT_DIR."""
+    non_git = tmp_path / "not_a_repo"
+    non_git.mkdir()
+
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(non_git))
+    monkeypatch.chdir(non_git)
+
+    from claude_workflow.lib.state import project_root
+    assert project_root() == non_git.resolve()
+
+
+def test_project_root_falls_back_to_cwd_when_no_env_no_git(tmp_path, monkeypatch):
+    """Outside any git repo and no env var -> use cwd."""
+    non_git = tmp_path / "no_env_no_git"
+    non_git.mkdir()
+
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.chdir(non_git)
+
+    from claude_workflow.lib.state import project_root
+    assert project_root() == non_git.resolve()

@@ -5,6 +5,7 @@ import copy
 import json
 import os
 import re
+import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -94,7 +95,34 @@ INITIAL_STATE: dict[str, Any] = {
 
 
 def project_root() -> Path:
-    """從環境變數或 cwd 推 project root。"""
+    """Resolve the project root.
+
+    Order: `git rev-parse --show-toplevel` first (returns the worktree path
+    correctly when invoked inside a git worktree), then `CLAUDE_PROJECT_DIR`
+    env var (set by Claude Code at session start; may point at the parent repo,
+    so it's a fallback for non-git contexts only), then cwd.
+
+    Issue #13: Claude Code sets `CLAUDE_PROJECT_DIR` to the directory the
+    session started in. Inside `.worktrees/<branch>/`, that's the parent repo
+    — not the worktree. Hooks reading `state_path()` would then read the
+    parent's `dev-state.json`, prefix file paths with `.worktrees/<branch>/`,
+    and false-positive against plan target_files. Asking git directly avoids
+    this — git knows about worktrees.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=2,
+        )
+        toplevel = result.stdout.strip()
+        if toplevel:
+            return Path(toplevel).resolve()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
     env = os.environ.get("CLAUDE_PROJECT_DIR")
     if env:
         return Path(env).resolve()
