@@ -577,7 +577,7 @@ Tick each as PRs merge:
 - [x] #48 mode-switch deviation reset — PR #55 (2026-05-10, merge 53a4f8e)
 - [x] #33 current_phase bootstrap — PR #56 (2026-05-10, merge 54271ce)
 - [x] #49 is_in_rebase worktree — PR #58 (2026-05-10, merge fa245d4); follow-up #59 (test/cwd minor)
-- [ ] #42 init-fresh.sh hardening
+- [x] #42 init-fresh.sh hardening (idempotency guard) — PR #60 (merge c86699a)
 - [ ] #34 PR merge worktree order
 - [ ] #38 stale egg-info cleanup
 
@@ -594,6 +594,7 @@ Tick each as PRs merge:
 - [ ] #43 state.py refactor
 - [ ] #27 item 1 (modes shallow override)
 - [ ] #57 post_skill bootstrap test gaps + diagnostic [WARN] logging (filed by #33's cascade audit)
+- [ ] #61 init-fresh.sh: lenient --force argv parsing + redundant mkdir (filed by #42's cascade audit)
 
 ### Track D
 - [ ] #40 doctrine drift sweep
