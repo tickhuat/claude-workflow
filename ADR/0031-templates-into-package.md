@@ -44,4 +44,4 @@ ADR 0030 §1's repo layout diagram is superseded by this decision. The Stable/In
 
 - The matching `claude-workflow-init` CLI is delivered alongside this layout change in the same plan.
 - A future cycle adds CI smoke testing of the wheel content (issue [#41](https://github.com/tickhuat/claude-workflow/issues/41)).
-- Stale `templates/.claude/**` references in `src/claude_workflow/lib/runtime_paths.py` were noted during code review and should be cleaned up in a follow-up cycle (do not amend them in this ADR's plan — out of scope per the §5 Stable/Internal contract).
+- Stale `templates/.claude/**` references in `src/claude_workflow/lib/runtime_paths.py` are dead but harmless (the broader `src/claude_workflow/**` glob already covers the new `_templates/` path). Tracked as cleanup in [issue #51](https://github.com/tickhuat/claude-workflow/issues/51).

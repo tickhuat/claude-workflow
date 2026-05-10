@@ -78,7 +78,7 @@ For `require_phase_verify` and `require_review`: in Phase 3 these flags are vali
 
 `lib/config.py` validates each mode record at config-load time. If any required field is missing, it prints a `[ERROR by dev-rules]` line to stderr and falls back to the built-in defaults. This prevents a silently broken mode from bypassing gates unexpectedly.
 
-Implementation status: shipped in Round 4 Phase 3. `lib/modes.py` provides `ModeRegistry`, `ModeConfig`, and `current_mode_config(state)`; the `feature` mode YAML record lives in `templates/.claude/dev-rules.config.yaml` (mirrored to `.claude/dev-rules.config.yaml`) and is mirrored in `lib/config.py` `DEFAULTS` (ADR 0015).
+Implementation status: shipped in Round 4 Phase 3. `lib/modes.py` provides `ModeRegistry`, `ModeConfig`, and `current_mode_config(state)`; the `feature` mode YAML record lives in `src/claude_workflow/_templates/.claude/dev-rules.config.yaml` (mirrored to `.claude/dev-rules.config.yaml`; see [ADR 0031](../../ADR/0031-templates-into-package.md)) and is mirrored in `lib/config.py` `DEFAULTS` (ADR 0015).
 
 ---
 

@@ -100,7 +100,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite existing files. Default: skip with a message.",
+        help=(
+            "Overwrite existing files, INCLUDING .claude/dev-state.json "
+            "(which resets workflow state to INITIAL_STATE — "
+            "do not use inside an in-flight project). Default: skip with a message."
+        ),
     )
     args = parser.parse_args(argv)
     target = args.target if args.target is not None else Path.cwd()

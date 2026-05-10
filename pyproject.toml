@@ -24,6 +24,10 @@ include = ["claude_workflow*"]
 [tool.setuptools.package-data]
 # `**` does not descend into dotdirs in setuptools globs; second pattern
 # is needed to reach files directly under _templates/.claude/.
+# IMPORTANT: when adding _templates/<new_subdir>/ (especially a non-dot
+# subdir), extend this glob AND add the new files to REQUIRED_PATHS in
+# tests/scripts/test_wheel_contents.py — otherwise they silently drop
+# from the wheel without test coverage.
 claude_workflow = ["_templates/.claude/**/*", "_templates/.claude/*"]
 
 [project.scripts]

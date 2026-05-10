@@ -149,13 +149,13 @@ Per [ADR 0029](../../ADR/0029-version-policy-semver.md), the following are **bre
 - **`dev-state.json` schema stable parts** — the documented stable fields of the runtime state file. The schema_version migration mechanism itself is a backwards-compat design and adding a new migration is not breaking.
 - **`dev-rules.config.yaml` stable keys** — the keys declared as stable in ADR 0030's extension API table. Adding a new stable key is backwards-compatible; removing or renaming an existing stable key is breaking.
 - **`init-fresh.sh` CLI contract** — supported flags and exit codes for the init script.
-- **`claude-workflow-init` CLI contract** — supported flags (`--target`, `--force`) and exit codes for the scaffold console script.
+- **`claude-workflow-init` CLI contract** — supported flags (`--target`, `--force`) and exit codes for the scaffold console script. The Python-importable surface (`from claude_workflow.cli import init`) is **Internal**: signature changes do not bump version.
 
 The following are **not breaking changes**:
 
 - Adding a new workflow mode (e.g., `bugfix`, `chore`, `hotfix`).
 - Adding a new doctrine doc to `docs/doctrine/`.
-- Internal refactoring within `src/claude_workflow/**/*.py` that does not change the hook contract or stable schema.
+- Internal refactoring within `src/claude_workflow/**/*.py` that does not change the hook contract or stable schema (this includes `claude_workflow.cli.init`'s signature).
 - Adding a new hook that does not modify existing hook behavior.
 - Adding a new stable schema field in a backwards-compatible way.
 
