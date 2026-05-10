@@ -574,7 +574,7 @@ reason to deviate (in which case ask).
 Tick each as PRs merge:
 
 ### Track A
-- [ ] #48 mode-switch deviation reset
+- [x] #48 mode-switch deviation reset — PR #55 (2026-05-10, merge 53a4f8e)
 - [ ] #33 current_phase bootstrap
 - [ ] #49 is_in_rebase worktree
 - [ ] #42 init-fresh.sh hardening
