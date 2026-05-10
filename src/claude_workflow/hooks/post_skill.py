@@ -119,6 +119,41 @@ def _try_transition(state: State, skill: str) -> None:
         state.data["last_commit_violation"] = None
         state.data["last_verify_fail"] = None
     state.set_stage(target)
+    # Issue #33: bootstrap current_phase from plan on first plan-ready →
+    # exec-running entry. Without this, current_phase stays at 0 (the
+    # INITIAL_STATE bootstrap default), which (a) false-flags first src/
+    # edits as deviations because phase_files_touched["0"] is empty, and
+    # (b) silently no-ops auto-advance after VERIFY-PASS phase=1 because
+    # the recorded current_phase doesn't match the verification claim.
+    # Guarded on current_phase==0 so re-entering exec-running after auto-
+    # advance (already moved to phase N+1) doesn't reset to phase 1.
+    # phases_total is intentionally NOT rewritten here: the plan-ready
+    # transition (above) already set it as len(phases), which is the
+    # semantic the all_done check expects (len(phases_verified) >=
+    # phases_total). Sparse phase ids would diverge from max(ids) and
+    # silently break that check.
+    if (
+        target == "exec-running"
+        and state.data.get("current_plan")
+        and state.data.get("current_phase", 0) == 0
+    ):
+        plan_path = project_root() / state.data["current_plan"]
+        try:
+            fm, _ = parse(plan_path.read_text())
+            phases = fm.get("phases") or []
+            ids = [p["id"] for p in phases if isinstance(p, dict) and "id" in p]
+            if ids:
+                first = min(ids)
+                state.data["current_phase"] = first
+                print(
+                    f"[INFO by dev-rules] bootstrapped current_phase={first} "
+                    f"from {state.data['current_plan']}",
+                    file=sys.stderr,
+                )
+        except (OSError, FrontmatterError, KeyError, ValueError, TypeError):
+            # Plan unreadable / malformed: leave current_phase at 0.
+            # Downstream tooling already handles missing-plan cases.
+            pass
 
 
 def _extract_agent_text(resp: dict) -> str:

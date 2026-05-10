@@ -575,3 +575,58 @@ def test_post_skill_switch_mode_no_op_when_mid_flow(set_stage):
     state = json.loads((Path.cwd() / ".claude" / "dev-state.json").read_text())
     assert state["mode"] == "feature", "mid-flow switch should not have changed mode"
     assert state["stage"] == "spec-ready", "mid-flow switch should not have changed stage"
+
+
+def test_post_skill_bootstraps_current_phase_on_exec_running(tmp_project, set_stage):
+    """Issue #33: plan-ready → exec-running must initialise current_phase to
+    the plan's lowest phases[].id (not leave it at the bootstrap 0)."""
+    plan_rel = "docs/superpowers/plans/test-plan.md"
+    plan_path = tmp_project / plan_rel
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(
+        "---\n"
+        "title: Test plan\n"
+        "date: 2026-05-10\n"
+        "adrs: [0001-x]\n"
+        "phases:\n"
+        "  - id: 1\n"
+        "    name: First\n"
+        "    target_files: [x.py]\n"
+        "    verify_command: 'true'\n"
+        "  - id: 2\n"
+        "    name: Second\n"
+        "    target_files: [y.py]\n"
+        "    verify_command: 'true'\n"
+        "---\nbody"
+    )
+    set_stage(
+        stage="plan-ready",
+        mode="feature",
+        current_plan=plan_rel,
+        current_phase=0,
+        phases_total=0,
+    )
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "executing-plans"}}, tmp_project)
+    assert r.returncode == 0, f"hook errored: stderr={r.stderr}"
+    state = json.loads((tmp_project / ".claude" / "dev-state.json").read_text())
+    assert state["stage"] == "exec-running"
+    assert state["current_phase"] == 1, (
+        f"expected current_phase bootstrapped to 1, got {state['current_phase']}"
+    )
+    # Bonus per acceptance: helpful [INFO] stderr line.
+    assert "[INFO by dev-rules]" in r.stderr
+    assert "current_phase" in r.stderr
+
+
+def test_post_skill_bootstrap_safe_when_no_plan_emergency_path(set_stage):
+    """Emergency path: switch-mode-bugfix from idle into exec-running has NO
+    current_plan. Bootstrap must NOT crash and must leave current_phase=0."""
+    set_stage(stage="idle", mode="feature", current_plan=None, current_phase=0)
+    r = run(POST, {"tool_name": "Skill", "tool_input": {"skill": "switch-mode-bugfix"}}, Path.cwd())
+    assert r.returncode == 0, f"hook errored: stderr={r.stderr}"
+    state = json.loads((Path.cwd() / ".claude" / "dev-state.json").read_text())
+    assert state["stage"] == "exec-running"
+    assert state["mode"] == "bugfix"
+    assert state["current_phase"] == 0, "emergency path must leave current_phase at 0"
+    # Should not have printed a bootstrap INFO line (no plan to bootstrap from).
+    assert "bootstrapped current_phase" not in r.stderr
