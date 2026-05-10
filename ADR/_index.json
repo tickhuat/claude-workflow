@@ -208,5 +208,12 @@
     "status": "Accepted",
     "file": "0030-distribution-pypi-architecture.md",
     "summary": "採用 **PyPI-installable architecture，但暫不發 PyPI**（Spec 0 選項 β）："
+  },
+  {
+    "id": "0031",
+    "title": "Templates moved into `src/claude_workflow/_templates/` for wheel distribution",
+    "status": "Accepted",
+    "file": "0031-templates-into-package.md",
+    "summary": "Templates are physically relocated to `src/claude_workflow/_templates/` and ship as package data via setuptools."
   }
 ]
