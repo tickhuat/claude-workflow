@@ -91,17 +91,47 @@ def test_init_fresh_removes_dogfood_keeps_engine(tmp_path):
     assert (tmp_path / "tests" / "scripts" / "conftest.py").exists()
 
 
-def test_init_fresh_idempotent(tmp_path):
-    """Running the script twice should not error (rm -f tolerance)."""
+def test_init_fresh_refuses_second_run(tmp_path):
+    """After a successful run, a marker file is written; a re-run without
+    --force aborts with a helpful message and leaves files untouched."""
     _seed_repo(tmp_path)
-    for _ in range(2):
-        r = subprocess.run(
-            ["bash", "scripts/init-fresh.sh"],
-            cwd=tmp_path,
-            capture_output=True,
-            text=True,
-        )
-        assert r.returncode == 0, f"script failed on re-run: {r.stderr}"
+
+    r1 = subprocess.run(
+        ["bash", "scripts/init-fresh.sh"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert r1.returncode == 0, f"first run failed: {r1.stderr}"
+    marker = tmp_path / ".claude" / ".init-fresh-done"
+    assert marker.is_file(), "marker should be written after first successful run"
+
+    # Second run without --force: must abort.
+    r2 = subprocess.run(
+        ["bash", "scripts/init-fresh.sh"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert r2.returncode != 0, "second run without --force should fail"
+    assert "already" in r2.stderr.lower(), \
+        f"expected 'already' in stderr, got: {r2.stderr!r}"
+
+    # Sanity: ADR template still present (script didn't re-wipe).
+    assert (tmp_path / "ADR" / "0000-template.md").is_file()
+
+
+def test_init_fresh_force_allows_second_run(tmp_path):
+    """--force overrides the marker guard; rm -f tolerance preserved."""
+    _seed_repo(tmp_path)
+
+    r1 = subprocess.run(
+        ["bash", "scripts/init-fresh.sh"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert r1.returncode == 0, f"first run failed: {r1.stderr}"
+
+    r2 = subprocess.run(
+        ["bash", "scripts/init-fresh.sh", "--force"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert r2.returncode == 0, f"--force run failed: {r2.stderr}"
 
 
 def test_init_fresh_resets_dev_state_and_removes_bypass_log(tmp_path):
