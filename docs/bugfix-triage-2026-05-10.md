@@ -576,7 +576,7 @@ Tick each as PRs merge:
 ### Track A
 - [x] #48 mode-switch deviation reset — PR #55 (2026-05-10, merge 53a4f8e)
 - [x] #33 current_phase bootstrap — PR #56 (2026-05-10, merge 54271ce)
-- [ ] #49 is_in_rebase worktree
+- [x] #49 is_in_rebase worktree — PR #58 (2026-05-10, merge fa245d4); follow-up #59 (test/cwd minor)
 - [ ] #42 init-fresh.sh hardening
 - [ ] #34 PR merge worktree order
 - [ ] #38 stale egg-info cleanup
