@@ -52,3 +52,17 @@ def test_version_matches_pyproject() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text())
     assert claude_workflow.__version__ == pyproject["project"]["version"]
+
+
+def test_templates_directory_is_package_data() -> None:
+    """_templates ships as package data (not a Python subpackage).
+
+    Verified via importlib.resources: the package can locate _templates
+    after `pip install -e .`. Wheel inclusion is a separate concern
+    covered by test_wheel_contents.py.
+    """
+    from importlib.resources import files
+
+    root = files("claude_workflow") / "_templates"
+    assert root.is_dir(), f"{root} should be a directory after pip install -e ."
+    assert (root / ".claude" / "settings.json").is_file()

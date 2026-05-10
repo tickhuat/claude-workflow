@@ -48,6 +48,13 @@ Round 4 redesigns the repository layout so that framework code is physically sep
 ```
 src/claude_workflow/
   __init__.py
+  cli.py                            # claude-workflow-init entry point
+  _templates/                       # bundled scaffold sources (Internal)
+    .claude/
+      settings.json
+      dev-rules.config.yaml
+      scripts/notify.sh
+      skills/switch-mode-{feature,bugfix}/SKILL.md
   hooks/
     pre_skill.py
     post_skill.py
@@ -63,6 +70,7 @@ src/claude_workflow/
     modes.py
     frontmatter.py
     adr_index.py
+scripts/init-fresh.sh               # fork-flow wrapper; delegates to CLI
 ```
 
 Hook commands in `.claude/settings.json` change from `python .claude/scripts/<name>.py` to:
@@ -87,12 +95,15 @@ No git merge required. User state (`.claude/dev-state.json`, their own ADRs, the
 
 **PyPI publication is deferred.** At zero external users, pushing to PyPI would violate the ship-for-self principle in `docs/PHILOSOPHY.md`. When the first external user appears, publishing to PyPI is an incremental 30-minute `twine upload` operation that requires no architectural changes — the package layout is already PyPI-ready after Round 4.
 
-The `init-fresh.sh` script is upgraded alongside the architecture. Rather than only deleting dogfood examples, it becomes a scaffold step:
+The `init-fresh.sh` script is the fork-flow wrapper. After [ADR 0031](../../ADR/0031-templates-into-package.md), it delegates the template-copy and `dev-state.json` initialization to the shared `claude-workflow-init` console script. The script's responsibilities are:
 
-1. Runs `pip install -e .` (makes hook entry points reachable)
-2. Copies `templates/.claude/` and `templates/docs/doctrine/` into the user's project
-3. Removes `ADR/`, `docs/superpowers/specs/`, and `docs/superpowers/plans/`
-4. Initializes an empty `dev-state.json`
+1. Discover a Python ≥3.10 interpreter and create `.venv/` if missing.
+2. Run `pip install -e .` (makes hook entry points reachable; aborts on failure before any destructive cleanup).
+3. Strip dogfood content (`docs/superpowers/{specs,plans}/*.md`, `ADR/*.md` except `0000-template.md`, `ADR/README.md`, runtime artifacts under `.claude/`).
+4. Reset `ADR/_index.json` to `[]`.
+5. Invoke `.venv/bin/claude-workflow-init` to copy the bundled `_templates/.claude/` baseline into `.claude/` (skip-existing semantics) and write a fresh `dev-state.json` from `INITIAL_STATE`.
+
+`claude-workflow-init` is the canonical scaffold entry point. PyPI users invoke it directly after `pip install claude-workflow`; fork users invoke it transitively via `init-fresh.sh`. Both paths share the same template-copy code, eliminating the previous fork-vs-PyPI drift.
 
 ---
 
@@ -107,7 +118,7 @@ The `init-fresh.sh` script is upgraded alongside the architecture. Rather than o
 | `docs/doctrine/**/*.md` | **Stable** | Fork users can add project-specific doctrine docs alongside framework-shipped ones. The framework will not overwrite files in this path during upgrades. |
 | Hook entry-point names (`python -m claude_workflow.hooks.<name>`) | **Stable** | Part of the hook contract. Renaming an entry point requires a MAJOR version bump (post-1.0) or MINOR bump (pre-1.0). |
 | `src/claude_workflow/**/*.py` | **Internal** | No stability guarantee. Fork users who import directly from these modules do so at their own risk. Large internal refactors may happen at MAJOR boundaries. |
-| `templates/**` content | **Internal** | Framework-provided defaults. Updated without versioning guarantees; `init-fresh.sh` copies a snapshot at scaffold time. |
+| `src/claude_workflow/_templates/**` content | **Internal** | Framework-provided defaults bundled with the wheel via `[tool.setuptools.package-data]`. Updated without versioning guarantees; `claude-workflow-init` copies a snapshot at scaffold time. See [ADR 0031](../../ADR/0031-templates-into-package.md). |
 
 The stable surface is what the framework "distributes outward." The internal surface is what remains inside the distribution boundary and can evolve freely.
 
@@ -138,12 +149,13 @@ Per [ADR 0029](../../ADR/0029-version-policy-semver.md), the following are **bre
 - **`dev-state.json` schema stable parts** — the documented stable fields of the runtime state file. The schema_version migration mechanism itself is a backwards-compat design and adding a new migration is not breaking.
 - **`dev-rules.config.yaml` stable keys** — the keys declared as stable in ADR 0030's extension API table. Adding a new stable key is backwards-compatible; removing or renaming an existing stable key is breaking.
 - **`init-fresh.sh` CLI contract** — supported flags and exit codes for the init script.
+- **`claude-workflow-init` CLI contract** — supported flags (`--target`, `--force`) and exit codes for the scaffold console script. The Python-importable surface (`from claude_workflow.cli import init`) is **Internal**: signature changes do not bump version.
 
 The following are **not breaking changes**:
 
 - Adding a new workflow mode (e.g., `bugfix`, `chore`, `hotfix`).
 - Adding a new doctrine doc to `docs/doctrine/`.
-- Internal refactoring within `src/claude_workflow/**/*.py` that does not change the hook contract or stable schema.
+- Internal refactoring within `src/claude_workflow/**/*.py` that does not change the hook contract or stable schema (this includes `claude_workflow.cli.init`'s signature).
 - Adding a new hook that does not modify existing hook behavior.
 - Adding a new stable schema field in a backwards-compatible way.
 
@@ -161,7 +173,7 @@ Fork users clone the GitHub template and run `init-fresh.sh` to scaffold. There 
 
 After the PyPI-installable architecture described in [ADR 0030](../../ADR/0030-distribution-pypi-architecture.md) is landed:
 
-1. **Initial setup**: clone or create from template, run `init-fresh.sh` (which runs `pip install -e .` automatically).
+1. **Initial setup**: clone or create from template, run `init-fresh.sh` (which runs `pip install -e .` automatically). PyPI users alternatively run `pip install claude-workflow && claude-workflow-init` once PyPI publish is wired ([issue #39](https://github.com/tickhuat/claude-workflow/issues/39)).
 2. **Day-to-day**: the framework package lives in site-packages; user state lives in the project directory. These two layers never interfere.
 3. **Upgrade**: run `pip install -U claude-workflow`. Framework code updates; user state is untouched. No git merge, no conflict resolution.
 
