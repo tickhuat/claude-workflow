@@ -575,7 +575,7 @@ Tick each as PRs merge:
 
 ### Track A
 - [x] #48 mode-switch deviation reset — PR #55 (2026-05-10, merge 53a4f8e)
-- [ ] #33 current_phase bootstrap
+- [x] #33 current_phase bootstrap — PR #56 (2026-05-10, merge 54271ce)
 - [ ] #49 is_in_rebase worktree
 - [ ] #42 init-fresh.sh hardening
 - [ ] #34 PR merge worktree order
@@ -593,6 +593,7 @@ Tick each as PRs merge:
 - [ ] #44 test coverage gaps
 - [ ] #43 state.py refactor
 - [ ] #27 item 1 (modes shallow override)
+- [ ] #57 post_skill bootstrap test gaps + diagnostic [WARN] logging (filed by #33's cascade audit)
 
 ### Track D
 - [ ] #40 doctrine drift sweep
