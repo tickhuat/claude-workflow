@@ -33,8 +33,26 @@ def get_last_commit_message(cwd: Path) -> str | None:
 
 
 def is_in_rebase(cwd: Path) -> bool:
-    """Detect if cwd is inside a git rebase (interactive or apply)."""
-    git_dir = cwd / ".git"
+    """Detect if cwd is inside a git rebase (interactive or apply).
+
+    Resolves the actual git dir via `git rev-parse --git-dir` so worktrees
+    map to <main>/.git/worktrees/<name>/ rather than the gitdir-pointer
+    file at <worktree>/.git (issue #49)."""
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return False
+    if r.returncode != 0:
+        return False
+    git_dir = Path(r.stdout.strip())
+    if not git_dir.is_absolute():
+        git_dir = (Path(cwd) / git_dir).resolve()
     return (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists()
 
 
