@@ -112,7 +112,7 @@ def git_common_dir(cwd: Path) -> Path | None:
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=2,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
@@ -122,3 +122,32 @@ def git_common_dir(cwd: Path) -> Path | None:
     if not p.is_absolute():
         p = (cwd / p).resolve()
     return p
+
+
+def git_toplevel(cwd: Path | None = None) -> Path | None:
+    """Return the working-tree toplevel from `cwd` (handles worktrees correctly).
+
+    Inside a git worktree, returns the worktree's path — not the main repo's.
+    Inside a regular repo, returns the repo path. Returns None if `cwd` is
+    outside any git repo or git isn't installed.
+
+    Used by `state.project_root()` (issue #13) and any caller that needs the
+    "what does git think the working root is here" answer rather than the
+    common-dir / main-repo answer that `git_common_dir` provides.
+    """
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=str(cwd) if cwd is not None else None,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+    if r.returncode != 0:
+        return None
+    out = r.stdout.strip()
+    if not out:
+        return None
+    return Path(out).resolve()

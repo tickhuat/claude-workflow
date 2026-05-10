@@ -37,6 +37,23 @@ def _reset_config_cache():
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_project_root_cache():
+    """Each test starts with a fresh project_root() cache.
+
+    project_root() is lru_cached for performance (issue #13: pre_edit calls
+    it ~5x per fire, git rev-parse is ~6ms). Tests that monkeypatch cwd or
+    CLAUDE_PROJECT_DIR within the same pytest process would otherwise see
+    stale cached values.
+    """
+    try:
+        from claude_workflow.lib.state import project_root
+        project_root.cache_clear()
+    except ImportError:
+        pass
+    yield
+
+
 @pytest.fixture
 def set_stage(tmp_project):
     """Helper to write specific dev-state.json with given stage and overrides."""

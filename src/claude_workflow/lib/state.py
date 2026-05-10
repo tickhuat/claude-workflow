@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import os
 import re
-import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -94,6 +94,7 @@ INITIAL_STATE: dict[str, Any] = {
 }
 
 
+@functools.lru_cache(maxsize=1)
 def project_root() -> Path:
     """Resolve the project root.
 
@@ -108,20 +109,18 @@ def project_root() -> Path:
     parent's `dev-state.json`, prefix file paths with `.worktrees/<branch>/`,
     and false-positive against plan target_files. Asking git directly avoids
     this — git knows about worktrees.
+
+    Result is cached per-process: `pre_edit` calls this 4-5x per fire and
+    `git rev-parse` is ~6ms; the cache collapses that to one invocation.
+    Tests that mutate cwd / CLAUDE_PROJECT_DIR within the same pytest process
+    must call `project_root.cache_clear()` between cases (the autouse
+    `_reset_project_root_cache` fixture in tests/scripts/conftest.py does this).
     """
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=2,
-        )
-        toplevel = result.stdout.strip()
-        if toplevel:
-            return Path(toplevel).resolve()
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        pass
+    from claude_workflow.lib.git_utils import git_toplevel
+
+    toplevel = git_toplevel()
+    if toplevel is not None:
+        return toplevel
 
     env = os.environ.get("CLAUDE_PROJECT_DIR")
     if env:
