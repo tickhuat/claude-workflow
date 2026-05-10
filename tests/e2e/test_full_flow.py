@@ -85,13 +85,12 @@ def test_full_flow(e2e_project):
     s = json.loads(state_p.read_text())
     assert s["stage"] == "plan-ready"
 
-    # 7. executing-plans → exec-running
+    # 7. executing-plans → exec-running. Issue #33: post_skill now
+    # bootstraps current_phase from the plan's lowest phases[].id.
     fire(hook("post_skill"), {"tool_name": "Skill", "tool_input": {"skill": "executing-plans"}}, e2e_project)
     s = json.loads(state_p.read_text())
     assert s["stage"] == "exec-running"
-    # current_phase auto-set? It's not in current implementation, so set manually.
-    s["current_phase"] = 1
-    state_p.write_text(json.dumps(s))
+    assert s["current_phase"] == 1
 
     # 8. TDD: write test first
     test_a = e2e_project / "tests" / "test_a.py"
