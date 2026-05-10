@@ -55,7 +55,7 @@ def test_cascade_auditing_prompt_has_placeholders() -> None:
         assert placeholder in prompt, f"cascade-prompt.md missing placeholder: {placeholder}"
 
 
-TEMPLATES_SKILLS_DIR = REPO_ROOT / "templates" / ".claude" / "skills"
+TEMPLATES_SKILLS_DIR = REPO_ROOT / "src" / "claude_workflow" / "_templates" / ".claude" / "skills"
 
 EXPECTED_TEMPLATE_SKILLS = [
     pytest.param("switch-mode-bugfix", id="switch_mode_bugfix"),

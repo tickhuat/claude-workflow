@@ -188,7 +188,7 @@ def test_init_fresh_copies_templates_claude_baseline(tmp_path):
     assert r.returncode == 0, f"script failed: {r.stderr}"
 
     live = (tmp_path / ".claude" / "settings.json").read_text()
-    tpl = (tmp_path / "templates" / ".claude" / "settings.json").read_text()
+    tpl = (PROJECT_ROOT / "src" / "claude_workflow" / "_templates" / ".claude" / "settings.json").read_text()
     assert live == tpl, "init-fresh.sh did not copy templates/.claude/settings.json"
 
 
@@ -197,5 +197,5 @@ def test_init_fresh_copies_templates_dev_rules_config(tmp_path):
     _seed_repo(tmp_path)
     subprocess.run(["bash", "scripts/init-fresh.sh"], cwd=tmp_path, check=True)
     live = (tmp_path / ".claude" / "dev-rules.config.yaml").read_text()
-    tpl = (tmp_path / "templates" / ".claude" / "dev-rules.config.yaml").read_text()
+    tpl = (PROJECT_ROOT / "src" / "claude_workflow" / "_templates" / ".claude" / "dev-rules.config.yaml").read_text()
     assert live == tpl

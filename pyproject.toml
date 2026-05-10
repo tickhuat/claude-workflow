@@ -14,11 +14,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "build>=1.0",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["claude_workflow*"]
+
+[tool.setuptools.package-data]
+claude_workflow = ["_templates/.claude/**/*", "_templates/.claude/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -20,7 +20,7 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TPL = REPO_ROOT / "templates" / ".claude"
+TPL = REPO_ROOT / "src" / "claude_workflow" / "_templates" / ".claude"
 
 
 def test_templates_settings_json_exists() -> None:
