@@ -51,10 +51,12 @@ After Track A, daily framework usage becomes much smoother.
 
 ### Track B — PyPI publication path (one feature cycle)
 
-7. **#35 + #37** wheel + console script — spec + plan ALREADY on main; just execute
+7. ~~**#35 + #37** wheel + console script~~ — ✅ done in PR #52 (2026-05-10 11:55Z, parallel session)
 8. **#36** PyPI metadata — small bugfix-mode pyproject edit
 9. **#41** CI hardening — adds 3.13 + wheel smoke + init-fresh e2e
 10. **#39** publish workflow — depends on 7-9 done
+
+**Side effect of #52:** PR #52's pipe install error-handling tightening lifted item 1 of #42 — see #42 hand-off below for the now-reduced scope.
 
 ### Track C — Coverage + cleanup (lower priority)
 
@@ -271,45 +273,38 @@ Report back: PR URL.
 
 ---
 
-### #42 — `init-fresh.sh`: pip errors silenced + no idempotency guard
+### #42 — `init-fresh.sh`: idempotency guard (item 1 already done in #52)
+
+> **Reduced scope:** PR #52 already lifted item 1 (pip-error visibility) when
+> rewriting init-fresh.sh to delegate to claude-workflow-init. Only item 2
+> (idempotency guard) remains. Verify by re-reading current init-fresh.sh
+> before starting.
 
 ```
-Context: claude-workflow framework. Bug to fix: issue #42.
+Context: claude-workflow framework. Bug to fix: issue #42 (only item 2).
 
-Problem: scripts/init-fresh.sh has two issues:
-1. Line ~57: `pip install -e . --quiet` swallows errors; if pip fails
-   (network, PEP 668, build tools missing), user sees "stripping dogfood"
-   next and the destructive cleanup runs anyway.
-2. No idempotency guard; re-running wipes ADRs + dogfood again. README
-   warns but the script itself doesn't refuse.
+Problem: scripts/init-fresh.sh has no idempotency guard; re-running
+wipes ADRs + dogfood again. README warns but the script itself doesn't
+refuse. (Item 1 — silenced pip errors — was already fixed in PR #52,
+verify before duplicating.)
 
 Workflow:
 1. Skill(using-superpowers) → switch-mode-bugfix.
 2. git checkout -b feature/issue-42-init-fresh-hardening
 3. RED test in tests/scripts/test_init_fresh.py:
-   a. New test_init_fresh_aborts_on_pip_failure: simulate pip failure
-      (e.g. point PIP_INDEX_URL at a nonexistent host, or mock `pip` via
-      PATH manipulation) and assert script exits non-zero AND ADR/ +
-      docs/superpowers/specs/ are still present (not wiped).
-   b. New test_init_fresh_refuses_second_run: run the script once, then
-      run it again, assert second run exits with a "scaffold already
-      complete" error message AND existing files are unchanged.
+   New test_init_fresh_refuses_second_run: run the script once, then
+   run it again, assert second run exits with a "scaffold already
+   complete" error message AND existing files (ADR/, dogfood) are unchanged.
 4. Verify RED.
 5. GREEN edits to scripts/init-fresh.sh:
-   - Replace `pip install -e . --quiet` with explicit error-checking:
-       if ! .venv/bin/pip install -e . ; then
-           echo "ERROR: pip install -e . failed; aborting before destructive cleanup" >&2
-           exit 1
-       fi
-     (drop --quiet so the user can see what failed)
-   - Add idempotency guard near the top, after `set -euo pipefail`:
+   Add idempotency guard near the top, after `set -euo pipefail`:
        MARKER=".claude/.init-fresh-done"
        if [ -f "$MARKER" ] && [ "${1:-}" != "--force" ]; then
            echo "ERROR: $MARKER exists; init-fresh already ran." >&2
            echo "       Use --force to re-run (destructive)." >&2
            exit 1
        fi
-   - At end of successful run, write the marker:
+   At end of successful run, write the marker:
        touch "$MARKER"
 6. Verify GREEN + full suite.
 7. Commit with closes #42.
@@ -587,7 +582,7 @@ Tick each as PRs merge:
 - [ ] #38 stale egg-info cleanup
 
 ### Track B
-- [ ] #35 + #37 wheel + console script
+- [x] #35 + #37 wheel + console script — PR #52 (parallel session, 2026-05-10 11:55Z)
 - [ ] #36 PyPI metadata
 - [ ] #41 CI hardening
 - [ ] #39 publish workflow
