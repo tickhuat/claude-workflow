@@ -199,6 +199,49 @@ def test_switch_mode_bugfix_resets_stale_phase_fields(set_stage):
     assert s["phases_verified"] == [], f"phases_verified not reset: {s['phases_verified']}"
 
 
+def test_switch_mode_bugfix_resets_stale_deviation_state(set_stage):
+    """Issue #48: when switching from done(feature) with deviations / commit
+    violations / phase_files_touched lingering from the previous cycle,
+    switch-mode-bugfix must clear them. Otherwise a feature → bugfix → feature
+    flow re-counts the OLD phase-1 deviations under the NEW phase 1 and trips
+    the >=3 hard block on the first new outside-plan touch."""
+    cwd = Path.cwd()
+    set_stage(
+        stage="done",
+        mode="feature",
+        deviation_log=[
+            {"phase": 1, "file": "src/old_a.py"},
+            {"phase": 1, "file": "src/old_b.py"},
+        ],
+        phase_files_touched={"1": ["src/old_a.py", "src/old_b.py"]},
+        last_commit_violation={
+            "phase": 1,
+            "message_excerpt": "old commit",
+            "ts": "2026-04-29T00:00:02Z",
+        },
+        last_verify_fail="phase=1: old failure",
+    )
+
+    pre = _run(PRE, _skill_event("switch-mode-bugfix"), cwd)
+    assert pre.returncode == 0, f"pre_skill blocked: {pre.stderr}"
+    post = _run(POST, _skill_event("switch-mode-bugfix"), cwd)
+    assert post.returncode == 0, f"post_skill errored: {post.stderr}"
+
+    s = _state(cwd)
+    assert s["mode"] == "bugfix"
+    assert s["stage"] == "exec-running"
+    assert s["deviation_log"] == [], f"deviation_log not reset: {s['deviation_log']}"
+    assert s["phase_files_touched"] == {}, (
+        f"phase_files_touched not reset: {s['phase_files_touched']}"
+    )
+    assert s.get("last_commit_violation") is None, (
+        f"last_commit_violation not reset: {s.get('last_commit_violation')!r}"
+    )
+    assert s.get("last_verify_fail") is None, (
+        f"last_verify_fail not reset: {s.get('last_verify_fail')!r}"
+    )
+
+
 def test_feature_mode_blocks_exec_running_to_reviewed_skip(set_stage):
     """Cascade audit I-4 fix: feature mode (require_phase_verify=True) must
     NOT allow Skill(requesting-code-review) from exec-running to skip

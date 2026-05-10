@@ -111,6 +111,13 @@ def _try_transition(state: State, skill: str) -> None:
         state.data["current_phase"] = 0
         state.data["phases_total"] = 0
         state.data["phases_verified"] = []
+        # Issue #48: also reset per-phase deviation/violation tracking. Without
+        # this, feature → bugfix → feature carries old phase-1 deviation_log
+        # entries into the new cycle's phase 1 and trips the >=3 hard block.
+        state.data["deviation_log"] = []
+        state.data["phase_files_touched"] = {}
+        state.data["last_commit_violation"] = None
+        state.data["last_verify_fail"] = None
     state.set_stage(target)
 
 
