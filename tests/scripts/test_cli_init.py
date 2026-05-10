@@ -103,3 +103,28 @@ def test_init_returns_nonzero_on_io_error(tmp_path: Path, monkeypatch) -> None:
 
     rc = cli.init(target=tmp_path, force=False)
     assert rc == 1
+
+
+def test_init_returns_nonzero_when_target_is_existing_file(tmp_path: Path) -> None:
+    """If --target points at an existing file, init returns 1 with a stderr message."""
+    from claude_workflow.cli import init
+
+    bad_target = tmp_path / "a-file"
+    bad_target.write_text("x")
+
+    rc = init(target=bad_target, force=False)
+    assert rc == 1
+
+
+def test_init_preserves_executable_bit_for_shell_scripts(tmp_path: Path) -> None:
+    """Bundled .sh files should land with execute permission set."""
+    import os
+    import stat
+    from claude_workflow.cli import init
+
+    rc = init(target=tmp_path, force=False)
+    assert rc == 0
+    notify = tmp_path / ".claude" / "scripts" / "notify.sh"
+    assert notify.is_file()
+    assert os.access(notify, os.X_OK), \
+        f"expected {notify} to be executable; mode={oct(notify.stat().st_mode & 0o777)}"

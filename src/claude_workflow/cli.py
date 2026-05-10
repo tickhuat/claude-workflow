@@ -34,7 +34,11 @@ def _walk(root, prefix: str = "") -> list[tuple[str, object]]:
 def init(target: Path, force: bool) -> int:
     """Scaffold a project at `target`. Returns process exit code."""
     target = Path(target)
-    target.mkdir(parents=True, exist_ok=True)
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        print(f"claude-workflow-init: cannot create target {target}: {e}", file=sys.stderr)
+        return 1
 
     templates_root = files("claude_workflow") / "_templates"
     if not templates_root.is_dir():
@@ -56,6 +60,8 @@ def init(target: Path, force: bool) -> int:
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(src.read_bytes())
+            if rel.endswith(".sh"):
+                dest.chmod(0o755)
             copied += 1
     except OSError as e:
         print(f"claude-workflow-init: I/O error: {e}", file=sys.stderr)
