@@ -26,6 +26,9 @@ include = ["claude_workflow*"]
 # is needed to reach files directly under _templates/.claude/.
 claude_workflow = ["_templates/.claude/**/*", "_templates/.claude/*"]
 
+[project.scripts]
+claude-workflow-init = "claude_workflow.cli:main"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
