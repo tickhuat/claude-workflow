@@ -578,7 +578,7 @@ Tick each as PRs merge:
 - [x] #33 current_phase bootstrap — PR #56 (2026-05-10, merge 54271ce)
 - [x] #49 is_in_rebase worktree — PR #58 (2026-05-10, merge fa245d4); follow-up #59 (test/cwd minor)
 - [x] #42 init-fresh.sh hardening (idempotency guard) — PR #60 (merge c86699a)
-- [ ] #34 PR merge worktree order
+- [x] #34 PR merge worktree order — PR #62
 - [ ] #38 stale egg-info cleanup
 
 ### Track B

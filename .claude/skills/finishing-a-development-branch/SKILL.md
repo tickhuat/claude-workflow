@@ -120,11 +120,12 @@ cleanup is left half-done. You MUST remove the worktree BEFORE running
 the merge command:
 
 ```bash
-# Verify the branch has a worktree
-git worktree list | grep $(git branch --show-current)
-
-# If it does — remove FIRST, from the main checkout (not from inside the worktree)
+# From the main checkout (NOT from inside the worktree), verify the
+# branch has a worktree:
 cd /path/to/main/checkout
+git worktree list | grep <branch-slug>
+
+# If it does — remove it FIRST
 git worktree remove .worktrees/<branch-slug>
 
 # THEN merge + delete remote branch
@@ -135,8 +136,9 @@ git checkout main && git pull --rebase
 git branch -D <branch-slug>  # only if not auto-deleted by gh
 ```
 
-For branches without a worktree, `git worktree list | grep` returns
-empty — skip the worktree-remove step and run `gh pr merge` directly.
+For branches without a worktree, the `git worktree list | grep` check
+returns empty — skip the worktree-remove step and run `gh pr merge`
+directly.
 
 #### Option 3: Keep As-Is
 
