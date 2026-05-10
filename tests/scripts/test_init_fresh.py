@@ -1,4 +1,5 @@
 """E2E test for scripts/init-fresh.sh — strips dogfood, keeps engine."""
+import json
 import os
 import shutil
 import subprocess
@@ -27,6 +28,17 @@ def _stub_venv(tmp_path):
         p = venv_bin / name
         p.write_text("#!/usr/bin/env bash\nexit 0\n")
         p.chmod(0o755)
+
+    # claude-workflow-init must do real work (copy templates) for tests
+    # below that assert template files end up in .claude/. Shim invokes
+    # the actual module via system python3 with PYTHONPATH pointing at
+    # the seeded src/ tree.
+    cli = venv_bin / "claude-workflow-init"
+    cli.write_text(
+        '#!/usr/bin/env bash\n'
+        'PYTHONPATH="$PWD/src" exec python3 -m claude_workflow.cli "$@"\n'
+    )
+    cli.chmod(0o755)
 
 
 def _seed_repo(dst: Path):
@@ -92,7 +104,7 @@ def test_init_fresh_idempotent(tmp_path):
         assert r.returncode == 0, f"script failed on re-run: {r.stderr}"
 
 
-def test_init_fresh_removes_dev_state_and_bypass_log(tmp_path):
+def test_init_fresh_resets_dev_state_and_removes_bypass_log(tmp_path):
     _seed_repo(tmp_path)
     # Simulate runtime artefacts present at fork time (rare but possible)
     (tmp_path / ".claude" / "dev-state.json").write_text('{"stage": "done"}')
@@ -106,7 +118,12 @@ def test_init_fresh_removes_dev_state_and_bypass_log(tmp_path):
         text=True,
     )
     assert r.returncode == 0
-    assert not (tmp_path / ".claude" / "dev-state.json").exists()
+    # Old dogfood dev-state replaced with INITIAL_STATE by claude-workflow-init.
+    state = json.loads((tmp_path / ".claude" / "dev-state.json").read_text())
+    assert state["schema_version"] == 3
+    assert state["stage"] == "idle"
+    assert state["mode"] == "feature"
+    # Bypass logs still removed by the script (CLI doesn't touch them).
     assert not (tmp_path / ".claude" / "bypass.log").exists()
     assert not (tmp_path / ".claude" / "bypass.log.old").exists()
 
@@ -199,3 +216,17 @@ def test_init_fresh_copies_templates_dev_rules_config(tmp_path):
     live = (tmp_path / ".claude" / "dev-rules.config.yaml").read_text()
     tpl = (PROJECT_ROOT / "src" / "claude_workflow" / "_templates" / ".claude" / "dev-rules.config.yaml").read_text()
     assert live == tpl
+
+
+def test_init_fresh_delegates_template_copy_to_cli():
+    """Phase 3: init-fresh.sh delegates template copy to claude-workflow-init.
+
+    Behavioral assertion at the script-text level (mirrors the existing
+    `test_init_fresh_script_invokes_pip_install` pattern). Single source
+    of truth for template-copy logic shared between fork and PyPI paths.
+    """
+    sh = (PROJECT_ROOT / "scripts" / "init-fresh.sh").read_text()
+    assert ".venv/bin/claude-workflow-init" in sh, \
+        "init-fresh.sh should call .venv/bin/claude-workflow-init for the template copy"
+    assert "cp -Rn templates/.claude" not in sh, \
+        "init-fresh.sh should no longer carry the old cp -Rn templates baseline copy"

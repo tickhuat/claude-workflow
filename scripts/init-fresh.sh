@@ -54,7 +54,10 @@ fi
 
 # Ensure framework is installed (editable mode so future upgrades are easy).
 echo "claude-workflow: installing framework (.venv/bin/pip install -e .)..."
-.venv/bin/pip install -e . --quiet
+if ! .venv/bin/pip install -e . ; then
+    echo "ERROR: pip install -e . failed; aborting before destructive cleanup" >&2
+    exit 1
+fi
 
 echo "claude-workflow: stripping dogfood examples..."
 
@@ -83,20 +86,10 @@ rm -f .claude/dev-state.json
 rm -f .claude/bypass.log
 rm -f .claude/bypass.log.old
 
-# Restore .claude/ baseline from shipped templates. We use cp -Rn so any
-# pre-existing user config (rare for a fresh fork, but possible) is
-# preserved. BSD cp returns 1 when -n skips a conflict (GNU cp returns 0);
-# the partial copy is still correct, so 0 and 1 are both healthy. Any
-# other exit code (permissions, missing source, full disk) is a real error.
-if [[ -d templates/.claude ]]; then
-    echo "claude-workflow: copying templates/.claude/ baseline..."
-    cp_rc=0
-    cp -Rn templates/.claude/. .claude/ || cp_rc=$?
-    case "$cp_rc" in
-        0|1) ;;
-        *) echo "ERROR: cp failed with rc=$cp_rc" >&2; exit "$cp_rc" ;;
-    esac
-fi
+# Restore .claude/ baseline + initialize dev-state.json from bundled templates.
+# Single source of truth shared with the PyPI install path.
+echo "claude-workflow: scaffolding .claude/ via claude-workflow-init..."
+.venv/bin/claude-workflow-init
 
 cat <<'EOF'
 
