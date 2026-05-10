@@ -12,6 +12,7 @@ __pycache__/
 .claude/scheduled_tasks.lock
 .claude/bypass.log
 .claude/.pre-bash-debug.log
+.claude/.init-fresh-done
 .superpowers/
 
 # Git worktrees (created by superpowers:using-git-worktrees)

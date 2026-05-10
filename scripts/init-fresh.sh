@@ -28,6 +28,22 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Idempotency guard (#42). The script is destructive — wipes ADRs, specs,
+# plans, and dev-state. Refuse a second run unless caller opts in with --force.
+MARKER=".claude/.init-fresh-done"
+FORCE=0
+for arg in "$@"; do
+    if [[ "$arg" == "--force" ]]; then
+        FORCE=1
+    fi
+done
+if [[ -f "$MARKER" && "$FORCE" -ne 1 ]]; then
+    echo "ERROR: $MARKER exists; init-fresh has already run." >&2
+    echo "       This script is destructive (wipes ADRs / specs /" >&2
+    echo "       plans / dev-state). Pass --force to re-run." >&2
+    exit 1
+fi
+
 # Find a Python >=3.10 to host the project venv. claude-workflow's hook
 # entry points (.claude/settings.json) call `.venv/bin/python -m
 # claude_workflow.hooks.<name>`, so the venv path is part of the contract.
@@ -90,6 +106,12 @@ rm -f .claude/bypass.log.old
 # Single source of truth shared with the PyPI install path.
 echo "claude-workflow: scaffolding .claude/ via claude-workflow-init..."
 .venv/bin/claude-workflow-init
+
+# Mark the scaffold as complete so a re-run aborts (#42). Written only after
+# all destructive ops succeed — set -euo pipefail aborts earlier on any failure,
+# leaving no marker so partial runs remain re-runnable.
+mkdir -p "$(dirname "$MARKER")"
+touch "$MARKER"
 
 cat <<'EOF'
 
