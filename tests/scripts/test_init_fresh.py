@@ -52,6 +52,10 @@ def _seed_repo(dst: Path):
         src = PROJECT_ROOT / f
         if src.exists():
             shutil.copy2(src, dst / f)
+    # Scrub the idempotency marker if a maintainer has run init-fresh.sh
+    # against their own checkout — copytree doesn't honor .gitignore, so the
+    # marker would otherwise leak in and trip the new guard on every test.
+    (dst / ".claude" / ".init-fresh-done").unlink(missing_ok=True)
 
 
 def test_init_fresh_removes_dogfood_keeps_engine(tmp_path):
