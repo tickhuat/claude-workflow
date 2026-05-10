@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import os
 import re
@@ -93,8 +94,34 @@ INITIAL_STATE: dict[str, Any] = {
 }
 
 
+@functools.lru_cache(maxsize=1)
 def project_root() -> Path:
-    """從環境變數或 cwd 推 project root。"""
+    """Resolve the project root.
+
+    Order: `git rev-parse --show-toplevel` first (returns the worktree path
+    correctly when invoked inside a git worktree), then `CLAUDE_PROJECT_DIR`
+    env var (set by Claude Code at session start; may point at the parent repo,
+    so it's a fallback for non-git contexts only), then cwd.
+
+    Issue #13: Claude Code sets `CLAUDE_PROJECT_DIR` to the directory the
+    session started in. Inside `.worktrees/<branch>/`, that's the parent repo
+    — not the worktree. Hooks reading `state_path()` would then read the
+    parent's `dev-state.json`, prefix file paths with `.worktrees/<branch>/`,
+    and false-positive against plan target_files. Asking git directly avoids
+    this — git knows about worktrees.
+
+    Result is cached per-process: `pre_edit` calls this 4-5x per fire and
+    `git rev-parse` is ~6ms; the cache collapses that to one invocation.
+    Tests that mutate cwd / CLAUDE_PROJECT_DIR within the same pytest process
+    must call `project_root.cache_clear()` between cases (the autouse
+    `_reset_project_root_cache` fixture in tests/scripts/conftest.py does this).
+    """
+    from claude_workflow.lib.git_utils import git_toplevel
+
+    toplevel = git_toplevel()
+    if toplevel is not None:
+        return toplevel
+
     env = os.environ.get("CLAUDE_PROJECT_DIR")
     if env:
         return Path(env).resolve()

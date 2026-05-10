@@ -71,3 +71,28 @@ def test_templates_notify_sh_matches_live() -> None:
         "templates/.claude/scripts/notify.sh drifted from "
         ".claude/scripts/notify.sh"
     )
+
+
+def test_templates_skills_match_live() -> None:
+    """Every templates/.claude/skills/<name>/SKILL.md has a byte-identical live copy.
+
+    Closes the drift gap surfaced by issue #13's review: the framework
+    ships switch-mode-* skills under templates/.claude/skills/ as part of
+    ADR 0028, but the dogfood .claude/skills/ originally lacked them — so
+    `Skill(switch-mode-bugfix)` reported "Unknown skill" when the
+    framework tried to use its own skill on itself. Any future skill added
+    to templates/ must also exist in dogfood with identical content.
+    """
+    tpl_skills = TPL / "skills"
+    assert tpl_skills.is_dir(), "templates/.claude/skills/ missing"
+
+    for tpl_skill_md in sorted(tpl_skills.rglob("SKILL.md")):
+        rel = tpl_skill_md.relative_to(tpl_skills)
+        live_skill_md = REPO_ROOT / ".claude" / "skills" / rel
+        assert live_skill_md.is_file(), (
+            f"templates/.claude/skills/{rel} has no live counterpart at "
+            f".claude/skills/{rel}"
+        )
+        assert live_skill_md.read_bytes() == tpl_skill_md.read_bytes(), (
+            f".claude/skills/{rel} drifted from templates/.claude/skills/{rel}"
+        )

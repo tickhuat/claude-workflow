@@ -17,9 +17,11 @@ _ADR_RE = re.compile(r"^(\d{4}-[\w-]+)\.md$")
 def _resolve_adr_root(file_path: Path) -> Path | None:
     """Return the directory that contains the ADR slug under file_path, or None.
 
-    Tries cheap project_root() first, only spawning `git rev-parse --git-common-dir`
-    (~6ms) if file is outside project_root — i.e. when running inside a worktree
-    while the ADR file lives in the main repo.
+    Tries project_root() first (lru-cached after issue #13; first call spawns
+    `git rev-parse --show-toplevel`, subsequent calls in the same process are
+    free), only spawning `git rev-parse --git-common-dir` (~6ms) if file is
+    outside project_root — i.e. when running inside a worktree while the ADR
+    file lives in the main repo.
     """
     root = project_root()
     try:
