@@ -22,6 +22,8 @@ where = ["src"]
 include = ["claude_workflow*"]
 
 [tool.setuptools.package-data]
+# `**` does not descend into dotdirs in setuptools globs; second pattern
+# is needed to reach files directly under _templates/.claude/.
 claude_workflow = ["_templates/.claude/**/*", "_templates/.claude/*"]
 
 [tool.pytest.ini_options]

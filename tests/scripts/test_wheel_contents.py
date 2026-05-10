@@ -38,7 +38,8 @@ def built_wheel(tmp_path_factory) -> Path:
     except FileNotFoundError:
         pytest.skip("python interpreter not found")
     except subprocess.CalledProcessError as e:
-        pytest.skip(f"wheel build failed: {e.stderr.decode(errors='replace')[:500]}")
+        stderr = e.stderr.decode(errors="replace")[:500]
+        raise AssertionError(f"wheel build failed: {stderr}") from e
     wheels = list(dist.glob("claude_workflow-*.whl"))
     assert wheels, f"no wheel produced in {dist}"
     return wheels[0]

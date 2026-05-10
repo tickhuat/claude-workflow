@@ -31,7 +31,7 @@ def _stub_venv(tmp_path):
 
 def _seed_repo(dst: Path):
     """Copy enough of the project tree into dst to simulate a fresh fork."""
-    for sub in (".claude", "src", "templates", "ADR", "docs/superpowers/specs",
+    for sub in (".claude", "src", "ADR", "docs/superpowers/specs",
                 "docs/superpowers/plans", "tests", "scripts"):
         src = PROJECT_ROOT / sub
         if src.exists():
