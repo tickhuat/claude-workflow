@@ -63,6 +63,43 @@ def test_is_in_rebase_apply_variant(tmp_path):
     assert is_in_rebase(tmp_path) is True
 
 
+def test_is_in_rebase_in_worktree(tmp_path):
+    """Issue #49: inside a git worktree, .git is a file with a `gitdir:`
+    pointer to <main>/.git/worktrees/<name>/, not a directory. The old
+    impl checked `cwd/.git/rebase-merge` as a path and always returned
+    False from a worktree. The fix uses `git rev-parse --git-dir`."""
+    from claude_workflow.lib.git_utils import is_in_rebase
+
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    _git_init(parent)
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-q", "-m", "init"],
+        cwd=parent, check=True,
+    )
+
+    worktree = tmp_path / "wt"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "feature/test", str(worktree)],
+        cwd=parent, check=True,
+    )
+    # Confirm fixture: inside a worktree, .git is a file (gitdir pointer).
+    assert (worktree / ".git").is_file()
+
+    # Resolve the worktree's actual git dir via git itself.
+    r = subprocess.run(
+        ["git", "rev-parse", "--git-dir"],
+        cwd=worktree, capture_output=True, text=True, check=True,
+    )
+    git_dir = Path(r.stdout.strip())
+    if not git_dir.is_absolute():
+        git_dir = (worktree / git_dir).resolve()
+
+    assert is_in_rebase(worktree) is False
+    (git_dir / "rebase-merge").mkdir()
+    assert is_in_rebase(worktree) is True
+
+
 def test_parse_git_command_push_to_main():
     from claude_workflow.lib.git_utils import parse_git_command
     r = parse_git_command("git push origin main")
