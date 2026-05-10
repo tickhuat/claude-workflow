@@ -127,6 +127,11 @@ def _try_transition(state: State, skill: str) -> None:
     # the recorded current_phase doesn't match the verification claim.
     # Guarded on current_phase==0 so re-entering exec-running after auto-
     # advance (already moved to phase N+1) doesn't reset to phase 1.
+    # phases_total is intentionally NOT rewritten here: the plan-ready
+    # transition (above) already set it as len(phases), which is the
+    # semantic the all_done check expects (len(phases_verified) >=
+    # phases_total). Sparse phase ids would diverge from max(ids) and
+    # silently break that check.
     if (
         target == "exec-running"
         and state.data.get("current_plan")
@@ -140,7 +145,6 @@ def _try_transition(state: State, skill: str) -> None:
             if ids:
                 first = min(ids)
                 state.data["current_phase"] = first
-                state.data["phases_total"] = max(ids)
                 print(
                     f"[INFO by dev-rules] bootstrapped current_phase={first} "
                     f"from {state.data['current_plan']}",

@@ -613,9 +613,6 @@ def test_post_skill_bootstraps_current_phase_on_exec_running(tmp_project, set_st
     assert state["current_phase"] == 1, (
         f"expected current_phase bootstrapped to 1, got {state['current_phase']}"
     )
-    assert state["phases_total"] == 2, (
-        f"expected phases_total=max(ids)=2, got {state['phases_total']}"
-    )
     # Bonus per acceptance: helpful [INFO] stderr line.
     assert "[INFO by dev-rules]" in r.stderr
     assert "current_phase" in r.stderr
