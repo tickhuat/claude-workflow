@@ -473,9 +473,31 @@ def test_migrate_v1_to_v2_succeeds_on_v1_input():
     assert result["skills_invoked"] == ["brainstorming"]
 
 
-def test_concurrent_v2_migration_only_one_info(tmp_project):
-    """Two subprocess loaders on a v1 file: only one prints the migration
-    INFO; final file is v2; both loaders see consistent v2 state.
+@pytest.mark.parametrize(
+    "initial_version, expected_v1_v2_info, expected_v2_v3_info",
+    [
+        # v1 input chains v1→v2→v3: exactly one of each INFO across all loaders.
+        # Pre-fix bug (issue #68): a slow loader, after another process had
+        # chained v1→v2→v3 between its LOCK_SH read and its LOCK_EX acquire,
+        # saw latest=v3 in the v1→v2 block's else branch and called
+        # _migrate_v1_to_v2 on v3 data → ValueError.
+        (1, 1, 1),
+        # v2 input: only v2→v3 migration fires; no v1→v2 INFO. Covers the
+        # v2→v3 concurrent race directly (no chain involved).
+        (2, 0, 1),
+    ],
+    ids=["v1_chain", "v2_only"],
+)
+def test_concurrent_chained_migration_no_race(
+    tmp_project, initial_version, expected_v1_v2_info, expected_v2_v3_info
+):
+    """N concurrent State.load() subprocesses against a state file at
+    `initial_version` must:
+    - all exit cleanly (no migrator-on-wrong-version ValueError),
+    - all report final schema_version == 3,
+    - leave the disk file at v3,
+    - emit exactly the expected count of each migration INFO across the
+      combined stderr (one INFO per migration step, regardless of N).
 
     Uses subprocess (not threading) because fcntl.flock is process-level —
     threads in the same process don't block each other on the lock.
@@ -486,29 +508,28 @@ def test_concurrent_v2_migration_only_one_info(tmp_project):
     import textwrap
     from concurrent.futures import ThreadPoolExecutor
 
-    # Pre-fill v1 state file (with namespaced skill so v2 dedupe has work to do)
     p = tmp_project / ".claude" / "dev-state.json"
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({
-        "schema_version": 1,
-        "stage": "idle",
-        "current_spec": None,
-        "current_plan": None,
-        "current_phase": 0,
-        "phases_total": 0,
-        "phases_verified": [],
-        "skills_invoked": ["superpowers:brainstorming"],
-        "adrs_read": [],
-        "deviation_log": [],
-        "event_flags": {
-            "debug_required": False,
-            "parallel_required": False,
-            "review_required": False,
-        },
-    }))
 
-    # Loader script: load State, print resulting schema_version on stdout,
-    # let stderr through so caller can capture INFO.
+    def initial_state():
+        return {
+            "schema_version": initial_version,
+            "stage": "idle",
+            "current_spec": None,
+            "current_plan": None,
+            "current_phase": 0,
+            "phases_total": 0,
+            "phases_verified": [],
+            "skills_invoked": ["superpowers:brainstorming"],
+            "adrs_read": [],
+            "deviation_log": [],
+            "event_flags": {
+                "debug_required": False,
+                "parallel_required": False,
+                "review_required": False,
+            },
+        }
+
     loader_script = textwrap.dedent(f"""
         import sys
         sys.path.insert(0, {str(_package_parent_dir()) !r})
@@ -527,31 +548,53 @@ def test_concurrent_v2_migration_only_one_info(tmp_project):
             timeout=10,
         )
 
-    # ThreadPoolExecutor only orchestrates the subprocess.run() calls; the
-    # actual race is between two real OS processes contending on flock.
-    with ThreadPoolExecutor(max_workers=2) as ex:
-        f1 = ex.submit(run_loader)
-        f2 = ex.submit(run_loader)
-        r1, r2 = f1.result(), f2.result()
+    # N processes per iteration, M iterations. Relies on natural Python-
+    # startup jitter (a synchronizing barrier would force strict-FIFO
+    # LOCK_EX ordering and SUPPRESS the chain race). The bug needs unfair
+    # lock acquisition where one process completes its full v1→v2→v3 chain
+    # while another is still queued at v1→v2 LOCK_EX. Per-iteration
+    # trigger probability is environment-dependent (~5 % at the low end on
+    # fast macOS local, higher on slower / busier CI). M=30 keeps the
+    # cumulative miss rate at ~21 % even at the 5 % lower bound
+    # (0.95**30 ≈ 0.21), which is acceptable as a regression guard given
+    # that the cumulative-across-CI-runs detection rate is far higher.
+    N = 5
+    M = 30
 
-    # Both subprocesses should exit cleanly with schema_version=3 on stdout
-    # (v1 input chains v1→v2 then v2→v3, terminal state is v3).
-    assert r1.returncode == 0, f"loader 1 failed: {r1.stderr}"
-    assert r2.returncode == 0, f"loader 2 failed: {r2.stderr}"
-    assert r1.stdout.strip() == "3"
-    assert r2.stdout.strip() == "3"
+    for iteration in range(M):
+        p.write_text(json.dumps(initial_state()))
+        with ThreadPoolExecutor(max_workers=N) as ex:
+            results = [
+                f.result()
+                for f in [ex.submit(run_loader) for _ in range(N)]
+            ]
 
-    # Final disk file is v3
-    final = json.loads(p.read_text())
-    assert final["schema_version"] == 3
+        for i, r in enumerate(results):
+            assert r.returncode == 0, (
+                f"iteration {iteration} loader {i} failed "
+                f"(returncode={r.returncode}):\nstderr: {r.stderr}"
+            )
+            assert r.stdout.strip() == "3", (
+                f"iteration {iteration} loader {i} reported "
+                f"schema_version={r.stdout.strip()!r}; expected 3"
+            )
 
-    # Combined stderr should contain exactly ONE migration INFO
-    combined_err = r1.stderr + r2.stderr
-    info_count = combined_err.count("state migrated v1 → v2")
-    assert info_count == 1, (
-        f"expected exactly 1 v2 migration INFO across both loaders; "
-        f"got {info_count}.\nstderr 1: {r1.stderr!r}\nstderr 2: {r2.stderr!r}"
-    )
+        final = json.loads(p.read_text())
+        assert final["schema_version"] == 3
+
+        combined_err = "".join(r.stderr for r in results)
+        v1_v2_count = combined_err.count("state migrated v1 → v2")
+        v2_v3_count = combined_err.count("state migrated v2 → v3")
+        assert v1_v2_count == expected_v1_v2_info, (
+            f"iteration {iteration}: expected {expected_v1_v2_info} v1→v2 "
+            f"INFOs across {N} loaders; got {v1_v2_count}.\n"
+            f"combined stderr:\n{combined_err}"
+        )
+        assert v2_v3_count == expected_v2_v3_info, (
+            f"iteration {iteration}: expected {expected_v2_v3_info} v2→v3 "
+            f"INFOs across {N} loaders; got {v2_v3_count}.\n"
+            f"combined stderr:\n{combined_err}"
+        )
 
 
 def test_initial_state_has_schema_version_3():
@@ -708,3 +751,25 @@ def test_project_root_falls_back_to_cwd_when_no_env_no_git(tmp_path, monkeypatch
 
     from claude_workflow.lib.state import project_root
     assert project_root() == non_git.resolve()
+
+
+def test_tmp_project_fixture_is_self_contained_git_tree(tmp_project):
+    """The `tmp_project` fixture must `git init` its tmp_path (issue #50 item 1).
+
+    Without this, project_root() inside the fixture walks `git rev-parse
+    --show-toplevel` up to whatever git tree happens to contain tmp_path —
+    a fork user running tests from `/some-repo/checkouts/claude-workflow/`
+    would see project_root() resolve to `/some-repo`, not to tmp_path.
+    Tests would then read/write the OUTER repo's `.claude/dev-state.json`
+    instead of the fixture's, producing confusing cross-test bleed.
+    """
+    assert (tmp_project / ".git").exists(), (
+        "tmp_project fixture must `git init` its tmp_path so it is its "
+        "own git toplevel — otherwise an ambient enclosing git tree wins."
+    )
+
+    # End-to-end: project_root() resolves to tmp_project even when the env
+    # var (set by the fixture) and cwd both already point there. The .git/
+    # check above is the load-bearing one; this is belt-and-braces.
+    from claude_workflow.lib.state import project_root
+    assert project_root().resolve() == tmp_project.resolve()

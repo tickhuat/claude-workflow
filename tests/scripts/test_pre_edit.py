@@ -382,6 +382,68 @@ def test_pre_edit_skips_spec_ready_block_when_require_spec_false(tmp_project):
     assert proc.returncode == 0, f"expected pass, got rc={proc.returncode}, stderr={proc.stderr}"
 
 
+def test_pre_edit_bugfix_mode_short_circuits_deviation_for_multiple_src_files(tmp_project):
+    """Targeted unit test for the bugfix-mode short-circuit at
+    pre_edit._check_exec_stage (ADR 0028 cascade-audit C-1).
+
+    In bugfix mode there is no plan and therefore no target_files, so every
+    src/ edit looks like a deviation from `_handle_deviation`'s perspective.
+    Without the `if not require_plan: return (0, False)` short-circuit the
+    deviation counter would block on the 3rd unique file — silently breaking
+    bugfix mode's core promise (small fixes with minimal ceremony).
+
+    Coverage gap (issue #44 item 1): test_bugfix_mode_e2e covers the full
+    cycle but does not exercise this specific failure shape; a future "tidy
+    up early return" refactor of `_check_exec_stage` could silently regress
+    multi-file bugfix edits. This test makes that regression loud.
+    """
+    import os
+    import subprocess
+    import sys
+    state_path = tmp_project / ".claude" / "dev-state.json"
+    state_path.write_text(json.dumps({
+        "schema_version": 3, "stage": "exec-running", "mode": "bugfix",
+        "current_spec": None, "current_plan": None,
+        "current_phase": 0, "phases_total": 0, "phases_verified": [],
+        "skills_invoked": ["switch-mode-bugfix"], "adrs_read": [],
+        "deviation_log": [],
+        "event_flags": {
+            "debug_required": False, "parallel_required": False,
+            "review_required": False,
+        },
+    }))
+
+    # 3 unrelated src/ files. In feature mode without a target_files match
+    # the third one would block (rc=2). In bugfix mode the short-circuit
+    # must pass all three.
+    files = [
+        tmp_project / "src" / "claude_workflow" / "lib" / "a.py",
+        tmp_project / "src" / "claude_workflow" / "lib" / "b.py",
+        tmp_project / "src" / "claude_workflow" / "hooks" / "c.py",
+    ]
+    for f in files:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        event = {"tool_name": "Edit", "tool_input": {"file_path": str(f)}}
+        proc = subprocess.run(
+            [sys.executable, "-m", "claude_workflow.hooks.pre_edit"],
+            input=json.dumps(event),
+            capture_output=True, text=True, cwd=tmp_project,
+            env={"CLAUDE_PROJECT_DIR": str(tmp_project), "PATH": os.environ["PATH"]},
+        )
+        assert proc.returncode == 0, (
+            f"bugfix mode must short-circuit deviation logic for src/ edits "
+            f"(file={f.name}, rc={proc.returncode}, stderr={proc.stderr})"
+        )
+
+    # Deviation log must remain empty — short-circuit returns BEFORE
+    # _handle_deviation appends to it.
+    final = json.loads(state_path.read_text())
+    assert final["deviation_log"] == [], (
+        f"bugfix-mode edits must not accumulate deviation entries; "
+        f"got {final['deviation_log']!r}"
+    )
+
+
 def test_pre_edit_blocks_in_spec_ready_when_require_spec_true(tmp_project):
     """Default feature mode (require_spec=true): spec-ready blocks src edits as today."""
     import json

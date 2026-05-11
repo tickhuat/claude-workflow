@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 
 PRE = "claude_workflow.hooks.pre_skill"
@@ -152,18 +154,33 @@ def test_pre_skill_passes_brainstorming_when_no_adrs(tmp_project):
     assert r.returncode == 0
 
 
-def test_pre_skill_fallback_index_excludes_superseded(tmp_project):
-    """When falling back to _index.json, Superseded ADRs should not be required."""
+@pytest.mark.parametrize("excluded_status", ["Superseded", "Rejected", "Proposed"])
+def test_pre_skill_fallback_index_excludes_non_accepted(tmp_project, excluded_status):
+    """ADR 0025: when falling back to _index.json, ONLY Accepted ADRs are
+    required-reading. Every other status (Superseded, Rejected, Proposed —
+    and by extension any future status) must be excluded from the prompt.
+
+    Coverage gap (issue #44 item 3): the original test only asserted this
+    for Superseded; a regression in pre_skill's filter could silently
+    require Rejected or Proposed ADRs without any test catching it.
+    """
     (tmp_project / "ADR" / "0001-x.md").write_text("---\nid: 0001\nstatus: Accepted\n---\n")
-    (tmp_project / "ADR" / "0002-y.md").write_text("---\nid: 0002\nstatus: Superseded\n---\n")
+    (tmp_project / "ADR" / "0002-y.md").write_text(
+        f"---\nid: 0002\nstatus: {excluded_status}\n---\n"
+    )
     (tmp_project / "ADR" / "_index.json").write_text(json.dumps([
-        {"id": "0001", "title": "X", "status": "Accepted", "file": "0001-x.md", "summary": "..."},
-        {"id": "0002", "title": "Y", "status": "Superseded", "file": "0002-y.md", "summary": "..."},
+        {"id": "0001", "title": "X", "status": "Accepted",
+         "file": "0001-x.md", "summary": "..."},
+        {"id": "0002", "title": "Y", "status": excluded_status,
+         "file": "0002-y.md", "summary": "..."},
     ]))
     r = run(PRE, {"tool_name": "Skill", "tool_input": {"skill": "brainstorming"}}, tmp_project)
     assert r.returncode == 2
     assert "0001-x" in r.stderr
-    assert "0002-y" not in r.stderr  # Superseded — not required
+    assert "0002-y" not in r.stderr, (
+        f"non-Accepted status {excluded_status!r} should be excluded but "
+        f"appeared in pre_skill block message"
+    )
 
 
 def test_pre_skill_passes_other_skills(tmp_project):
