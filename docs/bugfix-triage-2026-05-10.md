@@ -589,16 +589,17 @@ Tick each as PRs merge:
 
 ### Track C
 - [ ] #46 pre_edit integration test
-- [ ] #50 test hardening
-- [ ] #44 test coverage gaps
+- [x] #50 test hardening — Bundle A / PR #71 (merge bc0480b)
+- [x] #44 test coverage gaps — Bundle A / PR #71 (merge bc0480b)
 - [ ] #43 state.py refactor
 - [ ] #27 item 1 (modes shallow override)
 - [ ] #57 post_skill bootstrap test gaps + diagnostic [WARN] logging (filed by #33's cascade audit)
 - [ ] #61 init-fresh.sh: lenient --force argv parsing + redundant mkdir (filed by #42's cascade audit)
 - [ ] #63 finishing-a-development-branch Option 1 same worktree gotcha (filed by #34's cascade audit)
 - [ ] #65 Makefile minor refinements (filed by #38's cascade audit)
-- [ ] #68 test_concurrent_v2_migration_only_one_info flake (surfaced by #41 3.13 matrix; pre-existing race)
+- [x] #68 chained-migration race in State.load() — Bundle A / PR #71 (merge bc0480b); was the root cause of the v1→v2→v3 flake surfaced by #41's 3.13 matrix
 - [ ] #69 publish.yml polish (PEP 440 epoch/post, concurrency group, doctrine update) — filed by #39's cascade audit
+- [x] #31 verify-and-close #21 (worktree state pollution) — inline verified 2026-05-12; #21 confirmed fixed by #13's `git_toplevel()`
 
 ### Track D
 - [ ] #40 doctrine drift sweep
