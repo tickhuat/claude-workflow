@@ -31,12 +31,14 @@ def test_pyproject_has_readme() -> None:
 
 def test_pyproject_has_license() -> None:
     lic = _proj().get("license")
-    assert lic, "license missing"
+    assert isinstance(lic, dict) and lic.get("file") == "LICENSE", (
+        f"expected PEP 621 file-table form, got {lic!r}"
+    )
 
 
 def test_pyproject_has_authors() -> None:
     authors = _proj().get("authors")
-    assert authors and len(authors) > 0
+    assert authors and all(a.get("name") for a in authors)
 
 
 def test_pyproject_has_keywords() -> None:
