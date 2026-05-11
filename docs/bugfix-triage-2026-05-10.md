@@ -579,7 +579,7 @@ Tick each as PRs merge:
 - [x] #49 is_in_rebase worktree — PR #58 (2026-05-10, merge fa245d4); follow-up #59 (test/cwd minor)
 - [x] #42 init-fresh.sh hardening (idempotency guard) — PR #60 (merge c86699a)
 - [x] #34 PR merge worktree order — PR #62 (merge ac442a3); follow-up #63 (Option 1 has same gotcha)
-- [ ] #38 stale egg-info cleanup
+- [x] #38 stale egg-info cleanup (+ Makefile) — PR #64 (merge 82d4926); follow-up #65 (3 minor)
 
 ### Track B
 - [x] #35 + #37 wheel + console script — PR #52 (parallel session, 2026-05-10 11:55Z)
@@ -596,6 +596,7 @@ Tick each as PRs merge:
 - [ ] #57 post_skill bootstrap test gaps + diagnostic [WARN] logging (filed by #33's cascade audit)
 - [ ] #61 init-fresh.sh: lenient --force argv parsing + redundant mkdir (filed by #42's cascade audit)
 - [ ] #63 finishing-a-development-branch Option 1 same worktree gotcha (filed by #34's cascade audit)
+- [ ] #65 Makefile minor refinements (filed by #38's cascade audit)
 
 ### Track D
 - [ ] #40 doctrine drift sweep
