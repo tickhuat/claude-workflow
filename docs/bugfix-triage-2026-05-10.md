@@ -583,7 +583,7 @@ Tick each as PRs merge:
 
 ### Track B
 - [x] #35 + #37 wheel + console script — PR #52 (parallel session, 2026-05-10 11:55Z)
-- [ ] #36 PyPI metadata
+- [x] #36 PyPI metadata — PR #66 (merge 9d1cb3f); landed on PEP 639 SPDX form (setuptools>=77)
 - [ ] #41 CI hardening
 - [ ] #39 publish workflow
 
