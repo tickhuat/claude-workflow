@@ -584,7 +584,7 @@ Tick each as PRs merge:
 ### Track B
 - [x] #35 + #37 wheel + console script — PR #52 (parallel session, 2026-05-10 11:55Z)
 - [x] #36 PyPI metadata — PR #66 (merge 9d1cb3f); landed on PEP 639 SPDX form (setuptools>=77)
-- [ ] #41 CI hardening
+- [x] #41 CI hardening — PR #67 (merge 717d8dd); follow-up #68 (concurrent migration flake, pre-existing)
 - [ ] #39 publish workflow
 
 ### Track C
@@ -597,6 +597,7 @@ Tick each as PRs merge:
 - [ ] #61 init-fresh.sh: lenient --force argv parsing + redundant mkdir (filed by #42's cascade audit)
 - [ ] #63 finishing-a-development-branch Option 1 same worktree gotcha (filed by #34's cascade audit)
 - [ ] #65 Makefile minor refinements (filed by #38's cascade audit)
+- [ ] #68 test_concurrent_v2_migration_only_one_info flake (surfaced by #41 3.13 matrix; pre-existing race)
 
 ### Track D
 - [ ] #40 doctrine drift sweep
