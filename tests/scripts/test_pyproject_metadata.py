@@ -31,9 +31,11 @@ def test_pyproject_has_readme() -> None:
 
 def test_pyproject_has_license() -> None:
     lic = _proj().get("license")
-    assert isinstance(lic, dict) and lic.get("file") == "LICENSE", (
-        f"expected PEP 621 file-table form, got {lic!r}"
-    )
+    assert lic == "MIT", f"expected PEP 639 SPDX string 'MIT', got {lic!r}"
+
+
+def test_pyproject_has_license_files() -> None:
+    assert _proj().get("license-files") == ["LICENSE"]
 
 
 def test_pyproject_has_authors() -> None:
@@ -48,9 +50,12 @@ def test_pyproject_has_keywords() -> None:
 
 def test_pyproject_has_classifiers() -> None:
     cls = _proj().get("classifiers", [])
-    assert any("MIT" in c for c in cls), "MIT license classifier missing"
     assert any("Python :: 3" in c for c in cls), "Python version classifier missing"
+    assert any("Operating System ::" in c for c in cls), "OS classifier missing"
     assert len(cls) >= 6
+    assert not any("License ::" in c for c in cls), (
+        "License :: classifier is deprecated under PEP 639 SPDX form"
+    )
 
 
 def test_pyproject_has_urls() -> None:
