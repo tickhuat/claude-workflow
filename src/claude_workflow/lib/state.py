@@ -275,9 +275,12 @@ class State:
                         latest = json.loads(current) if current else {}
                     except json.JSONDecodeError:
                         latest = {}
-                    if latest.get("schema_version") == 2:
-                        # Another process won the race; use the migrated data
-                        # and stay silent (no INFO since we didn't migrate).
+                    if latest.get("schema_version", 1) >= 2:
+                        # Another process completed the migration to v2 or
+                        # chained further (v2→v3); use their data and stay
+                        # silent. The `>=` is load-bearing: `== 2` would
+                        # miss the chained case and fall to the else branch,
+                        # invoking _migrate_v1_to_v2 on v3 data (issue #68).
                         data = latest
                     else:
                         # Still v1 (or earlier); migrate latest disk state, write,
@@ -305,9 +308,10 @@ class State:
                         latest = json.loads(current) if current else {}
                     except json.JSONDecodeError:
                         latest = {}
-                    if latest.get("schema_version") == 3:
-                        # Another process won the race; use the migrated data
-                        # and stay silent (no INFO since we didn't migrate).
+                    if latest.get("schema_version", 2) >= 3:
+                        # Another process completed the migration to v3 (or
+                        # beyond, defensively); use their data and stay
+                        # silent. Symmetric with the v1→v2 block above.
                         data = latest
                     else:
                         data = _migrate_v2_to_v3(latest if latest else data)

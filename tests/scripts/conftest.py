@@ -1,6 +1,7 @@
 """Shared pytest fixtures for hook tests."""
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,11 +14,22 @@ import pytest
 
 @pytest.fixture
 def tmp_project(tmp_path, monkeypatch):
-    """建立一個 mock project 環境，含 .claude/、ADR/、docs/superpowers/。"""
+    """建立一個 mock project 環境，含 .claude/、ADR/、docs/superpowers/。
+
+    `git init` makes tmp_path its own git toplevel so project_root() doesn't
+    walk up into an ambient enclosing repo (issue #50 item 1: fork users
+    running pytest from inside a checkout would otherwise see project_root()
+    resolve to the outer repo, not tmp_path).
+    """
     (tmp_path / ".claude").mkdir()
     (tmp_path / "ADR").mkdir()
     (tmp_path / "docs" / "superpowers" / "specs").mkdir(parents=True)
     (tmp_path / "docs" / "superpowers" / "plans").mkdir(parents=True)
+    # `-b main` matches test_post_bash._git_init_with_commit and prevents
+    # a silent re-init downgrade to `master` on environments where
+    # init.defaultBranch is not configured (a re-init quietly ignores
+    # `-b`, leaving HEAD on whatever the fixture's first init produced).
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     return tmp_path
