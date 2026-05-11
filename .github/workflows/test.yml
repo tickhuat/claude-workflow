@@ -57,7 +57,11 @@ jobs:
           /tmp/wheel-smoke/bin/python -c "
           import claude_workflow
           import importlib.resources
-          assert claude_workflow.__version__ == '0.4.0', claude_workflow.__version__
+          # Equality with pyproject is enforced by tests/scripts/test_package_layout.py
+          # in the pytest job that build-wheel needs:. Here we only assert the
+          # wheel ships a non-empty version string, to avoid 3-place rot on bumps.
+          assert claude_workflow.__version__, 'empty __version__ in installed wheel'
+          print('installed __version__:', claude_workflow.__version__)
           tpl = importlib.resources.files('claude_workflow') / '_templates'
           assert tpl.is_dir(), f'_templates missing in installed package: {tpl}'
           assert (tpl / '.claude' / 'settings.json').is_file()
