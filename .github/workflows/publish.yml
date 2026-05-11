@@ -1,0 +1,64 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  # Opt into Node.js 24 ahead of GitHub's 2026-06 deadline so checkout/setup-python
+  # @v4 / @v5 don't emit the deprecation warning.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # required for PyPI OIDC trusted publishing
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify tag matches package version
+        run: |
+          set -euo pipefail
+          TAG_NAME="${GITHUB_REF_NAME}"  # e.g. "v0.4.0"
+          # Strict semver-ish format guard. Allows stable + pre-release suffixes
+          # (.devN | rcN | aN | bN). If you only want stable, drop the alternation.
+          if ! [[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+|rc[0-9]+|a[0-9]+|b[0-9]+)?$ ]]; then
+            echo "ERROR: tag '$TAG_NAME' is not a recognized release tag (v<MAJOR>.<MINOR>.<PATCH>[.devN|rcN|aN|bN])" >&2
+            exit 1
+          fi
+          TAG_VERSION="${TAG_NAME#v}"
+
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+          PKG_VERSION="$(python -c 'import claude_workflow; print(claude_workflow.__version__)')"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "ERROR: tag $TAG_VERSION != package $PKG_VERSION" >&2
+            exit 1
+          fi
+          echo "tag/version match: $TAG_VERSION OK"
+
+      - name: Build wheel + sdist
+        run: |
+          python -m pip install build twine
+          python -m build
+
+      - name: Twine metadata check
+        run: python -m twine check dist/*
+
+      - name: Publish to PyPI (Trusted Publisher / OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No `with:` block needed for default config:
+        #   - PyPI auto-discovers via OIDC
+        #   - Uploads from ./dist/
+        # If first publish fails with "no trusted publisher", complete the
+        # PyPI-side Pending Publisher setup (see this PR's description).
